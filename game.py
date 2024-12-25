@@ -248,9 +248,7 @@ class Game:
         px, py = self.pray.position
         grid[hx][hy] = "h"
         grid[px][py] = "p"
-
-        os.system("cls" if os.name == "nt" else "clear")
-        #print(f"Hunter FOV radius: {self.hunter.fov_radius}\n")
+        
         for row in grid:
             print(" ".join(row))
         print()
@@ -420,15 +418,13 @@ def train_game(episodes, grid_size, turns, batch_size, target_update_interval=10
             hunter_model.train(batch_size=batch_size)
             pray_model.train(batch_size=batch_size)
 
-            #os.system("cls" if os.name == "nt" else "clear")
+            os.system("cls" if os.name == "nt" else "clear")
 
-            print(f"--- Episode {episode + 1} ---\n")
-
-            if True: #(episode + 1) % 1 == 0:
+            if False: #(episode + 1) % 1 == 0:
                 game.render_field()
             else:
-                os.system("cls" if os.name == "nt" else "clear")
-                print(f"Turn {turn + 1}: Hunter={game.hunter.position}, Pray={game.pray.position}")
+                print(f"--- Episode {episode + 1} ---\n")
+                print(f"Turn {turn + 1}")
 
         episode_rewards_hunter.append(total_reward_hunter)
         episode_rewards_pray.append(total_reward_pray)
