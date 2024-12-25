@@ -248,7 +248,7 @@ class Game:
         px, py = self.pray.position
         grid[hx][hy] = "h"
         grid[px][py] = "p"
-        
+
         for row in grid:
             print(" ".join(row))
         print()
@@ -275,13 +275,13 @@ class BaseModel:
         self.target_model.load_state_dict(self.model.state_dict())
         self.target_model.eval()
         
-        self.optimizer = optim.Adam(self.model.parameters(), lr=0.001)
+        self.optimizer = optim.Adam(self.model.parameters(), lr=0.0001)
         self.criterion = nn.MSELoss()
         self.actions = actions
         self.replay_buffer = ReplayBuffer(capacity=10000)
         self.epsilon = 0.9
-        self.epsilon_decay = 0.995
-        self.epsilon_min = 0.1
+        self.epsilon_decay = 1000
+        self.epsilon_min = 0.05
 
     def get_valid_actions(self, state, walls):
         x, y = state["hunter_pos"] if hasattr(self, "hunter") else state["pray_pos"]
@@ -357,9 +357,7 @@ class PrayModel(BaseModel):
 
 
 
-def save_checkpoint(model, optimizer, epoch, epsilon, filename=None):
-    if filename is None:
-        filename = f"./checkpointN{epoch}.pth"
+def save_checkpoint(model, optimizer, epoch, epsilon, filename):
     checkpoint = {
         'model_state_dict': model.state_dict(),
         'optimizer_state_dict': optimizer.state_dict(),
@@ -420,7 +418,7 @@ def train_game(episodes, grid_size, turns, batch_size, target_update_interval=10
 
             os.system("cls" if os.name == "nt" else "clear")
 
-            if False: #(episode + 1) % 1 == 0:
+            if (episode + 1) % 10 == 0: #False: 
                 game.render_field()
             else:
                 print(f"--- Episode {episode + 1} ---\n")
@@ -430,6 +428,10 @@ def train_game(episodes, grid_size, turns, batch_size, target_update_interval=10
         episode_rewards_pray.append(total_reward_pray)
 
         print("Game Over!\n")
+
+        if (episode + 1) % 100 == 0:
+            save_checkpoint(hunter_model.model, hunter_model.optimizer, episode, hunter_model.epsilon, f"hunter_checkpoint{episode+1}.pth")
+            save_checkpoint(pray_model.model, pray_model.optimizer, episode, pray_model.epsilon, f"pray_checkpoint{episode+1}.pth")
     
     def moving_average(data, window_size):
         return np.convolve(data, np.ones(window_size) / window_size, mode='valid')
@@ -449,7 +451,5 @@ def train_game(episodes, grid_size, turns, batch_size, target_update_interval=10
     plt.grid(True)
     plt.show()
 
-    save_checkpoint(hunter_model.model, hunter_model.optimizer, epoch=10, epsilon=0.1)
 
-
-train_game(episodes=3000, grid_size=20, turns=400, batch_size=32)
+train_game(episodes=1000, grid_size=20, turns=400, batch_size=32)
