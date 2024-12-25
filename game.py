@@ -66,6 +66,7 @@ class Player:
             if self.is_hunter():
                 self.turns_stayed += 1
                 if self.turns_stayed != 0:
+# nice
                     self.fov_radius = self.original_fov_radius + 40
         else:
             self.turns_stayed = 0
@@ -189,7 +190,7 @@ class Game:
             "pray_vision": self.pray.vision
         }
 
-    def step(self, hunter_action, pray_action):
+    def step(self, hunter_action, pray_action, turn):
         self.hunter.move(hunter_action, self.walls)
         self.pray.move(pray_action, self.walls)
 
@@ -201,20 +202,29 @@ class Game:
             if self.hunter.turns_stayed >= 2:
                 print("Enemy UAV inbound!")"""
 
-        if pray_sees_hunter:
-            print(f"Pray sees the Hunter at {self.hunter.position}")
+        """if pray_sees_hunter:
+            print(f"Pray sees the Hunter at {self.hunter.position}")"""
 
         reward_hunter = 0
         reward_pray = 0
 
         if hunter_sees_pray and self.hunter.turns_stayed == 0:
-            reward_hunter += 1
-            reward_pray += 1
+            reward_hunter += 5
+            reward_pray -= 5
 
         if self.hunter.position == self.pray.position:
             reward_hunter += 50
-            reward_pray += 50
+            reward_pray -= 50
             return self.get_state(), reward_hunter, reward_pray, True
+
+        if not hunter_sees_pray:
+            hx, hy = self.hunter.position
+            px, py = self.pray.position
+            distance = abs(hx - px) + abs(hy - py)
+            reward_pray += min(distance * 0.1, 5)
+        
+        if not hunter_sees_pray and turn % 50 == 0 and self.hunter.position != self.pray.position:
+            reward_pray += 10
 
         reward_hunter -= 0.5
         reward_pray += 0.5
@@ -229,10 +239,10 @@ class Game:
                 grid[x][y] = "f"
 
         for x, y in self.pray.vision:
-            if grid[x][y] == ".":
+            if grid[x][y] == "f":
                 grid[x][y] = "f"
-            elif grid[x][y] == "f":
-                grid[x][y] = "b"
+            elif grid[x][y] == ".":
+                grid[x][y] = "f"
 
         hx, hy = self.hunter.position
         px, py = self.pray.position
@@ -240,7 +250,7 @@ class Game:
         grid[px][py] = "p"
 
         os.system("cls" if os.name == "nt" else "clear")
-        print(f"Hunter FOV radius: {self.hunter.fov_radius}")
+        #print(f"Hunter FOV radius: {self.hunter.fov_radius}\n")
         for row in grid:
             print(" ".join(row))
         print()
@@ -249,9 +259,9 @@ class Game:
 class DQN(nn.Module):
     def __init__(self, n_observations, n_actions):
         super(DQN, self).__init__()
-        self.layer1 = nn.Linear(n_observations, 128)
-        self.layer2 = nn.Linear(128, 128)
-        self.layer3 = nn.Linear(128, n_actions)
+        self.layer1 = nn.Linear(n_observations, 64)
+        self.layer2 = nn.Linear(64, 64)
+        self.layer3 = nn.Linear(64, n_actions)
 
     def forward(self, x):
         x = F.relu(self.layer1(x))
@@ -271,7 +281,7 @@ class BaseModel:
         self.criterion = nn.MSELoss()
         self.actions = actions
         self.replay_buffer = ReplayBuffer(capacity=10000)
-        self.epsilon = 1.0
+        self.epsilon = 0.9
         self.epsilon_decay = 0.995
         self.epsilon_min = 0.1
 
@@ -304,6 +314,7 @@ class BaseModel:
 
     def train(self, batch_size, gamma=0.99):
         if len(self.replay_buffer) < batch_size:
+            print(f"Kickstarting the engine, waiting for {len(self.replay_buffer)} 100 entries...")
             return
 
         states, actions, rewards, next_states, dones = self.replay_buffer.sample(batch_size)
@@ -350,7 +361,7 @@ class PrayModel(BaseModel):
 
 def save_checkpoint(model, optimizer, epoch, epsilon, filename=None):
     if filename is None:
-        filename = f"checkpointN{epoch}.pth"
+        filename = f"./checkpointN{epoch}.pth"
     checkpoint = {
         'model_state_dict': model.state_dict(),
         'optimizer_state_dict': optimizer.state_dict(),
@@ -384,7 +395,6 @@ def train_game(episodes, grid_size, turns, batch_size, target_update_interval=10
             hunter_model.target_model.load_state_dict(hunter_model.model.state_dict())
             pray_model.target_model.load_state_dict(pray_model.model.state_dict())
 
-        print(f"--- Episode {episode + 1} ---")
         game = Game(grid_size, turns)
         done = False
 
@@ -399,7 +409,7 @@ def train_game(episodes, grid_size, turns, batch_size, target_update_interval=10
             hunter_action = hunter_model.predict(state, game.walls)
             pray_action = pray_model.predict(state, game.walls)
 
-            next_state, reward_hunter, reward_pray, done = game.step(hunter_action, pray_action)
+            next_state, reward_hunter, reward_pray, done = game.step(hunter_action, pray_action, turn)
 
             total_reward_hunter += reward_hunter
             total_reward_pray += reward_pray
@@ -410,10 +420,11 @@ def train_game(episodes, grid_size, turns, batch_size, target_update_interval=10
             hunter_model.train(batch_size=batch_size)
             pray_model.train(batch_size=batch_size)
 
-            os.system("cls" if os.name == "nt" else "clear")
-            print(f"--- Episode {episode + 1} ---")
+            #os.system("cls" if os.name == "nt" else "clear")
 
-            if (episode + 1) % 10 == 0:
+            print(f"--- Episode {episode + 1} ---\n")
+
+            if True: #(episode + 1) % 1 == 0:
                 game.render_field()
             else:
                 print(f"Turn {turn + 1}: Hunter={game.hunter.position}, Pray={game.pray.position}")
@@ -427,17 +438,12 @@ def train_game(episodes, grid_size, turns, batch_size, target_update_interval=10
         return np.convolve(data, np.ones(window_size) / window_size, mode='valid')
     
     window_size = 50
-    smoothed_rewards_hunter = np.concatenate((np.zeros(window_size - 1), smoothed_rewards_hunter))
-    smoothed_rewards_pray = np.concatenate((np.zeros(window_size - 1), smoothed_rewards_pray))
-
 
     plt.figure(figsize=(10, 6))
 
+    reversed_rewards_pray = episode_rewards_pray[::-1]
     plt.plot(episode_rewards_hunter, color='green', alpha=0.5, label='Hunter Reward')
-    plt.plot(range(window_size - 1, len(episode_rewards_hunter)), smoothed_rewards_hunter, color='red', label='Smoothed Hunter Reward')
-
     plt.plot(episode_rewards_pray, color='blue', alpha=0.5, label='Pray Reward')
-    plt.plot(range(window_size - 1, len(episode_rewards_pray)), smoothed_rewards_pray, color='orange', label='Smoothed Pray Reward')
 
     plt.title("Training Progress")
     plt.xlabel("Episode")
@@ -446,5 +452,7 @@ def train_game(episodes, grid_size, turns, batch_size, target_update_interval=10
     plt.grid(True)
     plt.show()
 
+    save_checkpoint(hunter_model.model, hunter_model.optimizer, epoch=10, epsilon=0.1)
 
-train_game(episodes=100, grid_size=20, turns=512, batch_size=32)
+
+train_game(episodes=3000, grid_size=20, turns=400, batch_size=32)
