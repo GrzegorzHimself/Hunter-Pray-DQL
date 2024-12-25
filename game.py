@@ -427,6 +427,7 @@ def train_game(episodes, grid_size, turns, batch_size, target_update_interval=10
             if True: #(episode + 1) % 1 == 0:
                 game.render_field()
             else:
+                os.system("cls" if os.name == "nt" else "clear")
                 print(f"Turn {turn + 1}: Hunter={game.hunter.position}, Pray={game.pray.position}")
 
         episode_rewards_hunter.append(total_reward_hunter)
