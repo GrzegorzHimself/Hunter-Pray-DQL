@@ -230,21 +230,21 @@ class Game:
             reward_pray -= 1
 
         if self.hunter.position == self.pray.position:
-            reward_hunter += 50
-            reward_pray -= 50
+            reward_hunter += 10
+            reward_pray -= 10
             return self.get_state(), reward_hunter, reward_pray, True
 
         if not hunter_sees_pray:
             hx, hy = self.hunter.position
             px, py = self.pray.position
             distance = abs(hx - px) + abs(hy - py)
-            reward_pray += min(distance * 1, 5)
+            reward_pray += min(distance * 0.1, 5)
         
         """if not hunter_sees_pray and turn % 50 == 0 and self.hunter.position != self.pray.position:
             reward_pray += 10"""
 
-        reward_hunter -= 0.1
-        reward_pray += 0.1
+        reward_hunter -= 0.5
+        reward_pray += 0.5
 
         return self.get_state(), reward_hunter, reward_pray, False
 
@@ -297,7 +297,7 @@ class BaseModel:
         self.actions = actions
         self.replay_buffer = ReplayBuffer(capacity=10000)
         self.epsilon = 0.9
-        self.epsilon_decay = 1000
+        self.epsilon_decay = 0.995
         self.epsilon_min = 0.05
 
     def get_valid_actions(self, state, walls):
