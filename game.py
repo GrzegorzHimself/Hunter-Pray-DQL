@@ -8,6 +8,7 @@ from collections import deque
 import numpy as np
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
+import networkx as nx
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -163,25 +164,41 @@ class Game:
         field[:, 0] = 1
         field[:, -1] = 1
 
+        field[size // 3:size // 3 * 2, size // 3:size // 3 * 2] = 0
+
         for _ in range(4):
             new_field = field.copy()
             for x in range(1, size - 1):
                 for y in range(1, size - 1):
                     neighbors = np.sum(field[x-1:x+2, y-1:y+2]) - field[x, y]
-                    if field[x, y] == 1:
-                        if neighbors < 3:
-                            new_field[x, y] = 0
-                    else:
-                        if neighbors > 4:
-                            new_field[x, y] = 1
+                    if field[x, y] == 1 and neighbors < 3:
+                        new_field[x, y] = 0
+                    elif field[x, y] == 0 and neighbors > 4:
+                        new_field[x, y] = 1
             field = new_field
 
         wall_map = np.full((size, size), ".", dtype=str)
         wall_map[field == 1] = "w"
 
         self.accessible_tiles = [(x, y) for x in range(size) for y in range(size) if wall_map[x][y] == "."]
+
+        hunter_pos, pray_pos = random.sample(self.accessible_tiles, 2)
+        
+        while not self.accessible(wall_map, hunter_pos, pray_pos):
+            hunter_pos, pray_pos = random.sample(self.accessible_tiles, 2)
+        
+        self.hunter = Hunter(hunter_pos[0], hunter_pos[1], fov_radius=5, grid_size=size)
+        self.pray = Pray(pray_pos[0], pray_pos[1], fov_radius=5, grid_size=size)
         return wall_map.tolist()
 
+    def accessible(self, field, start, end):
+        graph = nx.grid_2d_graph(len(field), len(field[0]))
+        for x in range(len(field)):
+            for y in range(len(field[0])):
+                if field[x][y] == "w":
+                    graph.remove_node((x, y))
+        return nx.has_path(graph, start, end)
+    
     def get_state(self):
         return {
             "hunter_pos": self.hunter.position,
@@ -191,11 +208,11 @@ class Game:
         }
 
     def step(self, hunter_action, pray_action, turn):
-        self.hunter.move(hunter_action, self.walls)
         self.pray.move(pray_action, self.walls)
+        self.hunter.move(hunter_action, self.walls)
 
-        hunter_sees_pray = self.hunter.can_see(self.pray.position)
         pray_sees_hunter = self.pray.can_see(self.hunter.position)
+        hunter_sees_pray = self.hunter.can_see(self.pray.position)
 
         """if hunter_sees_pray and self.hunter.turns_stayed < 2:
             print(f"Hunter sees the Pray at {self.pray.position}")
@@ -209,8 +226,8 @@ class Game:
         reward_pray = 0
 
         if hunter_sees_pray and self.hunter.turns_stayed == 0:
-            reward_hunter += 5
-            reward_pray -= 5
+            reward_hunter += 1
+            reward_pray -= 1
 
         if self.hunter.position == self.pray.position:
             reward_hunter += 50
@@ -221,20 +238,20 @@ class Game:
             hx, hy = self.hunter.position
             px, py = self.pray.position
             distance = abs(hx - px) + abs(hy - py)
-            reward_pray += min(distance * 0.1, 5)
+            reward_pray += min(distance * 1, 5)
         
-        if not hunter_sees_pray and turn % 50 == 0 and self.hunter.position != self.pray.position:
-            reward_pray += 10
+        """if not hunter_sees_pray and turn % 50 == 0 and self.hunter.position != self.pray.position:
+            reward_pray += 10"""
 
-        reward_hunter -= 0.5
-        reward_pray += 0.5
+        reward_hunter -= 0.1
+        reward_pray += 0.1
 
         return self.get_state(), reward_hunter, reward_pray, False
 
     def render_field(self):
         grid = [row[:] for row in self.walls]
 
-        for x, y in self.hunter.vision:
+        """for x, y in self.hunter.vision:
             if grid[x][y] == ".":
                 grid[x][y] = "f"
 
@@ -242,7 +259,7 @@ class Game:
             if grid[x][y] == "f":
                 grid[x][y] = "f"
             elif grid[x][y] == ".":
-                grid[x][y] = "f"
+                grid[x][y] = "f"""""
 
         hx, hy = self.hunter.position
         px, py = self.pray.position
@@ -275,7 +292,7 @@ class BaseModel:
         self.target_model.load_state_dict(self.model.state_dict())
         self.target_model.eval()
         
-        self.optimizer = optim.Adam(self.model.parameters(), lr=0.0001)
+        self.optimizer = optim.Adam(self.model.parameters(), lr=0.01)
         self.criterion = nn.MSELoss()
         self.actions = actions
         self.replay_buffer = ReplayBuffer(capacity=10000)
@@ -377,11 +394,11 @@ def load_checkpoint(episodes, model, optimizer, filename="checkpoint.pth"):
     return epoch, epsilon
 
 def train_game(episodes, grid_size, turns, batch_size, target_update_interval=10):
-    hunter_model = HunterModel()
     pray_model = PrayModel()
+    hunter_model = HunterModel()
 
-    episode_rewards_hunter = []
     episode_rewards_pray = []
+    episode_rewards_hunter = []
 
     #start_episode, hunter_model.epsilon = load_checkpoint(hunter_model.model, hunter_model.optimizer, "hunter_checkpoint.pth")
     #start_episode, pray_model.epsilon = load_checkpoint(pray_model.model, pray_model.optimizer, "pray_checkpoint.pth")
@@ -394,27 +411,28 @@ def train_game(episodes, grid_size, turns, batch_size, target_update_interval=10
         game = Game(grid_size, turns)
         done = False
 
-        total_reward_hunter = 0
         total_reward_pray = 0
+        total_reward_hunter = 0
 
         for turn in range(turns):
             if done:
                 break
 
             state = game.get_state()
-            hunter_action = hunter_model.predict(state, game.walls)
+            
             pray_action = pray_model.predict(state, game.walls)
+            hunter_action = hunter_model.predict(state, game.walls)
 
             next_state, reward_hunter, reward_pray, done = game.step(hunter_action, pray_action, turn)
 
-            total_reward_hunter += reward_hunter
             total_reward_pray += reward_pray
+            total_reward_hunter += reward_hunter
 
-            hunter_model.remember(state, hunter_model.actions.index(hunter_action), reward_hunter, next_state, done)
             pray_model.remember(state, pray_model.actions.index(pray_action), reward_pray, next_state, done)
+            hunter_model.remember(state, hunter_model.actions.index(hunter_action), reward_hunter, next_state, done)
 
-            hunter_model.train(batch_size=batch_size)
             pray_model.train(batch_size=batch_size)
+            hunter_model.train(batch_size=batch_size)
 
             os.system("cls" if os.name == "nt" else "clear")
 
@@ -424,12 +442,12 @@ def train_game(episodes, grid_size, turns, batch_size, target_update_interval=10
                 print(f"--- Episode {episode + 1} ---\n")
                 print(f"Turn {turn + 1}")
 
-        episode_rewards_hunter.append(total_reward_hunter)
         episode_rewards_pray.append(total_reward_pray)
+        episode_rewards_hunter.append(total_reward_hunter)
 
-        print("Game Over!\n")
+        # print("Game Over!\n")
 
-        if (episode + 1) % 100 == 0:
+        if (episode + 1) % 500 == 0:
             save_checkpoint(hunter_model.model, hunter_model.optimizer, episode, hunter_model.epsilon, f"hunter_checkpoint{episode+1}.pth")
             save_checkpoint(pray_model.model, pray_model.optimizer, episode, pray_model.epsilon, f"pray_checkpoint{episode+1}.pth")
     
@@ -452,4 +470,4 @@ def train_game(episodes, grid_size, turns, batch_size, target_update_interval=10
     plt.show()
 
 
-train_game(episodes=1000, grid_size=20, turns=400, batch_size=32)
+train_game(episodes=1500, grid_size=20, turns=400, batch_size=32)
