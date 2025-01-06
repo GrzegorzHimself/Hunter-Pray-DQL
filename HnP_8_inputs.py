@@ -263,14 +263,17 @@ class Environment:
 
         return self.get_state(), reward_hunter, reward_prey, done
     
-    def render(self):
+    def render(self, return_frame=False):
         grid = [row[:] for row in self.walls]
         hx, hy = self.hunter.position
         px, py = self.prey.position
         grid[hx][hy] = "H"
         grid[px][py] = "P"
-        print("\n".join(" ".join(row) for row in grid))
-        print("-" * 40)
+        if return_frame:
+            return np.array(grid)
+        else:
+            print("\n".join(" ".join(row) for row in grid))
+            print("-" * 40)
 
         
 
