@@ -263,7 +263,7 @@ class Environment:
 
         if self.hunter.position == self.prey.position:
             reward_hunter = +30.0
-            reward_prey   = -30.0
+            reward_prey   = -50.0
             done = True
             return reward_hunter, reward_prey, done
 
@@ -273,7 +273,7 @@ class Environment:
         
         if self.hunter.position != self.prey.position and dist is not None:
             reward_hunter = -0.1*dist
-            reward_prey   = +0.1*dist
+            reward_prey   = +0.2*dist
             done = False
         else:
             if hunter_action in [0,1,2,3]:
@@ -438,7 +438,8 @@ def train_prey(prey_agent, hunter_agent, episodes, grid_size, turns, batch_size,
             hunter_action = hunter_agent.predict(state)
             prey_action   = prey_agent.predict(state)
 
-            next_state, _, reward_prey, done = env.step(hunter_action, prey_action)
+            _, reward_prey, done = env.step(hunter_action, prey_action)
+            next_state = env.get_state()
             prey_agent.replay_buffer.push(
                 state, prey_action, reward_prey, next_state, done
             )
