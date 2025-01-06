@@ -325,6 +325,9 @@ class Environment:
         return map_2d, scalar
 
     def step(self, hunter_action, prey_action):
+        reward_hunter = 0
+        reward_prey   = 0
+        done = False
         self.hunter.move(hunter_action, self.walls)
 
         if self.hunter.position == self.prey.position:
