@@ -382,17 +382,17 @@ def train_IQL(hunter_agent, prey_agent, episodes_hunter, episodes_prey, grid_siz
     plt.subplot(1, 2, 1)
     plt.scatter(range(len(total_reward_hunter)), total_reward_hunter, label="Hunter", color='#0E0598', s=10)
     avg_hunter = [np.mean(total_reward_hunter[max(0, i-50):i+1]) for i in range(len(total_reward_hunter))]
-    plt.plot(range(len(total_reward_hunter)), avg_hunter, color='orange', label="Hunter Avg")
+    plt.plot(range(len(total_reward_hunter)), avg_hunter, color='orange', label="Hunter Avg (50)")
     plt.xlabel("Episode")
     plt.ylabel("Reward")
     plt.title(f"IQL Hunter:\nGrid {grid_size}x{grid_size}; Turns {turns}; Episodes {episodes_hunter*tries*2}; FOV 5")
-    avg_prey = [np.mean(total_reward_prey[max(0, i-50):i+1]) for i in range(len(total_reward_prey))]
-    plt.plot(range(len(total_reward_prey)), avg_prey, color='green', label="Prey Avg")
     plt.legend()
     plt.grid(True)
     # Plot Prey rewards
     plt.subplot(1, 2, 2)
     plt.scatter(range(len(total_reward_prey)), total_reward_prey, label="Prey", color='xkcd:baby poop green', s=10)
+    rolling_avg_prey = [np.mean(total_reward_prey[max(0, i-50):i+1]) for i in range(len(total_reward_prey))]
+    plt.plot(range(len(total_reward_prey)), rolling_avg_prey, color='green', label="Prey Avg (50)")
     plt.xlabel("Episode")
     plt.ylabel("Reward")
     plt.title(f"IQL Prey:\nGrid {grid_size}x{grid_size}; Turns {turns}; Episodes {episodes_hunter*tries*2}; FOV 5")
