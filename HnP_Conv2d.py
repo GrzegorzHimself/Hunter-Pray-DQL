@@ -335,7 +335,7 @@ class Environment:
             reward_hunter = 30
             reward_prey   = -20.0
             done = True
-        if dist is not None:
+        if self.hunter.position != self.prey.position and dist is not None:
             reward_hunter = -0.1*dist
             reward_prey   = +0.1*dist
             done = False
