@@ -273,6 +273,7 @@ class Environment:
         if return_frame:
             return np.array(grid)
         else:
+            os.system("cls" if os.name == "nt" else "clear")
             print("\n".join(" ".join(row) for row in grid))
             print("-" * 40)
 
