@@ -334,6 +334,7 @@ class Environment:
             reward_hunter = 30.0
             reward_prey   = -30.0
             done = True
+            return reward_hunter, reward_prey, done
         
         self.prey.move(prey_action, self.walls)
         dist = a_star_distance(self.walls, tuple(self.hunter.position),
