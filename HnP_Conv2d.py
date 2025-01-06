@@ -31,7 +31,7 @@ class ReplayBuffer:
          dones) = zip(*batch)
         
         # Convert them into proper torch tensors
-        map_tensors         = torch.stack(map_tensors).to(device)               # shape: [B, 1, grid, grid]
+        map_tensors         = torch.stack(map_tensors).to(device)              # shape: [B, 1, grid, grid]
         scalar_tensors      = torch.stack(scalar_tensors).to(device)           # shape: [B, 8]
         next_map_tensors    = torch.stack(next_map_tensors).to(device)         # shape: [B, 1, grid, grid]
         next_scalar_tensors = torch.stack(next_scalar_tensors).to(device)      # shape: [B, 8]
@@ -256,6 +256,13 @@ class Environment:
 
         hunter_pos, prey_pos = random.sample(self.accessible_tiles, 2)
 
+        wall_map = self.generate_field(grid_size)
+
+        while True:
+            hunter_pos, prey_pos = random.sample(self.accessible_tiles, 2)
+            if self.check_accessibility(wall_map, hunter_pos, prey_pos):
+                break
+
         self.hunter = Player(hunter_pos[0], hunter_pos[1], fov_radius=5, grid_size=grid_size)
         self.prey   = Player(prey_pos[0],   prey_pos[1],   fov_radius=5, grid_size=grid_size)
 
@@ -274,14 +281,7 @@ class Environment:
         wall_map[field == 1] = "w"
 
         self.accessible_tiles = [(x, y) for x in range(size) for y in range(size) if wall_map[x][y] == "."]
-
-        while True:
-            hunter_pos, prey_pos = random.sample(self.accessible_tiles, 2)
-            if self.check_accessibility(wall_map, hunter_pos, prey_pos):
-                break
-
-        self.hunter = Player(hunter_pos[0], hunter_pos[1], fov_radius=5, grid_size=size)
-        self.prey   = Player(prey_pos[0],   prey_pos[1],   fov_radius=5, grid_size=size)
+        
         return wall_map.tolist()
 
     def check_accessibility(self, field, start, end):
