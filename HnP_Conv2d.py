@@ -426,6 +426,8 @@ def save_animation(frames, filename, fps=12):
     ani.save(filename, writer = writer)
     print(f"Animation saved as {filename}")
 
+    plt.close(fig)
+
 
 
 def train_hunter(hunter_agent, prey_agent, episodes, grid_size, turns, batch_size, render_on, n_try):
@@ -542,7 +544,6 @@ def train_IQL(hunter_agent, prey_agent, episodes_hunter, episodes_prey, grid_siz
                         grid_size, turns, batch_size, render_on, n_try)
         total_reward_prey.extend(rp)
     
-    plt.close('all')
     # MatPlotLib graphic output of the training cycle conducted
     plt.figure(figsize=(10, 5))
     # Plot Hunter rewards
