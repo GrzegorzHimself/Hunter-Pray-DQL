@@ -442,6 +442,7 @@ def train_IQL(hunter_agent, prey_agent, episodes_hunter, episodes_prey, grid_siz
 
 
 if __name__ == "__main__":
+    grid_size = 12
     hunter_agent = Agent(input_dim=8, n_actions=5)
     prey_agent   = Agent(input_dim=8, n_actions=5)
 
@@ -459,8 +460,8 @@ if __name__ == "__main__":
     train_IQL(hunter_agent, prey_agent,
               episodes_hunter=1000,
               episodes_prey=1000,
-              grid_size=20,
-              turns=int(20*20*0.75),
+              grid_size=grid_size,
+              turns=int(grid_size*grid_size*0.75),
               batch_size=32,
               tries = 3,
               render_on = False)
