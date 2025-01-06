@@ -58,7 +58,7 @@ class DQN(nn.Module):
 
 # ------------------- AGENT ------------------- #
 class Agent:
-    def __init__(self, input_dim, n_actions, gamma=0.99, epsilon=1.0, epsilon_decay=0.995, epsilon_min=0.1, lr=0.001):
+    def __init__(self, input_dim, n_actions, gamma=0.995, epsilon=1.0, epsilon_decay=0.95, epsilon_min=0.1, lr=0.001):
         self.n_actions = n_actions
         self.gamma = gamma
         self.epsilon = epsilon
@@ -415,6 +415,7 @@ def train_IQL(hunter_agent, prey_agent, episodes_hunter, episodes_prey, grid_siz
         rewards_prey = train_prey(prey_agent, hunter_agent, episodes_prey, grid_size, turns, batch_size, render_on, n_try)
         total_reward_prey.extend(rewards_prey)
     
+    plt.close('all')
     # MatPlotLib graphic output of the training cycle conducted
     plt.figure(figsize=(10, 5))
     # Plot Hunter rewards
@@ -462,7 +463,7 @@ if __name__ == "__main__":
               episodes_hunter=1000,
               episodes_prey=1000,
               grid_size=grid_size,
-              turns=int(grid_size*grid_size*0.75),
+              turns=int(grid_size*grid_size*2),
               batch_size=32,
-              tries = 3,
+              tries=3,
               render_on = False)
