@@ -391,8 +391,8 @@ def train_IQL(hunter_agent, prey_agent, episodes_hunter, episodes_prey, grid_siz
     # Plot Prey rewards
     plt.subplot(1, 2, 2)
     plt.scatter(range(len(total_reward_prey)), total_reward_prey, label="Prey", color='xkcd:baby poop green', s=10)
-    rolling_avg_prey = [np.mean(total_reward_prey[max(0, i-50):i+1]) for i in range(len(total_reward_prey))]
-    plt.plot(range(len(total_reward_prey)), rolling_avg_prey, color='green', label="Prey Avg (50)")
+    avg_prey = [np.mean(total_reward_prey[max(0, i-50):i+1]) for i in range(len(total_reward_prey))]
+    plt.plot(range(len(total_reward_prey)), avg_prey, color='green', label="Prey Avg (50)")
     plt.xlabel("Episode")
     plt.ylabel("Reward")
     plt.title(f"IQL Prey:\nGrid {grid_size}x{grid_size}; Turns {turns}; Episodes {episodes_hunter*tries*2}; FOV 5")
