@@ -190,19 +190,17 @@ class Environment:
     def __init__(self, grid_size, turns):
         self.grid_size = grid_size
         self.turns     = turns
-        self.walls     = self.generate_field(grid_size)
-
-        hunter_pos, prey_pos = random.sample(self.accessible_tiles, 2)
-
-        wall_map = self.generate_field(grid_size)
-
+        
         while True:
-            hunter_pos, prey_pos = random.sample(self.accessible_tiles, 2)
-            if self.check_accessibility(wall_map, hunter_pos, prey_pos):
-                break
+            wall_map = self.generate_field(grid_size)
+            hunter_pos, prey_pos = self.pick_positions(wall_map)
 
-        self.hunter = Player(hunter_pos[0], hunter_pos[1], fov_radius=5, grid_size=grid_size)
-        self.prey   = Player(prey_pos[0],   prey_pos[1],   fov_radius=5, grid_size=grid_size)
+            if hunter_pos is not None and prey_pos is not None:
+                break
+    
+        self.walls  = wall_map
+        self.hunter = Player(hunter_pos[0], hunter_pos[1], fov_radius=int(np.sqrt((grid_size^2)*2)), grid_size=grid_size)
+        self.prey   = Player(prey_pos[0],   prey_pos[1],   fov_radius=int(np.sqrt((grid_size^2)*2)), grid_size=grid_size)
 
         self.hunter.update_vision(self.walls)
         self.prey.update_vision(self.walls)
@@ -223,6 +221,17 @@ class Environment:
         
         return wall_map.tolist()
 
+    def pick_positions(self, wall_map):
+        if len(self.accessible_tiles) < 2:
+            return None, None
+        
+        for attempt in range(100):
+            hunter_pos, prey_pos = random.sample(self.accessible_tiles, 2)
+            if self.check_accessibility(wall_map, hunter_pos, prey_pos):
+                return hunter_pos, prey_pos
+            
+        return None, None
+    
     def check_accessibility(self, field, start, end):
         queue = [start]
         visited = set()
@@ -253,17 +262,19 @@ class Environment:
                                tuple(self.prey.position), self.grid_size)
 
         if self.hunter.position == self.prey.position:
-            reward_hunter = +30
-            reward_prey   = -20.0
+            reward_hunter = +30.0
+            reward_prey   = -30.0
             done = True
         if self.hunter.position != self.prey.position and dist is not None:
             reward_hunter = -0.1*dist
             reward_prey   = +0.1*dist
             done = False
         else:
-            reward_hunter = 0.0
-            reward_prey = 0.0
-            done = True
+            if hunter_action in [0,1,2,3]:
+                reward_hunter += 0.01
+
+        if hunter_action == 4:  # STAY
+            reward_hunter -= 0.5
 
         return self.get_state(), reward_hunter, reward_prey, done
     
@@ -394,7 +405,7 @@ def train_hunter(hunter_agent, prey_agent, episodes, grid_size, turns, batch_siz
 
         rewards_hunter.append(total_reward_hunter)
 
-        print(f"Episode {episode+1} out of {episodes}")
+        print(f"Episode {episode+1} out of {episodes} (Hunter {n_try})")
 
         if render_on and episode >= episodes - 5:
             save_animation(frames, f"hunter_episode_{n_try+1}_{episode+1}.gif")
@@ -439,7 +450,7 @@ def train_prey(prey_agent, hunter_agent, episodes, grid_size, turns, batch_size,
             prey_agent.update_target_model()
 
         rewards_prey.append(total_reward_prey)
-        print(f"Episode {episode+1} out of {episodes}")
+        print(f"Episode {episode+1} out of {episodes} (Prey {n_try})")
 
         if render_on and episode >= episodes - 5:
             save_animation(frames, f"prey_episode_{n_try+1}_{episode+1}.gif")
