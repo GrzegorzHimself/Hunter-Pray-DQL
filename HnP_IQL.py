@@ -187,43 +187,38 @@ class Player:
 # ------------------- ENVIRONMENT ------------------- #
 class Environment:
     def __init__(self, grid_size, turns):
-        # Declaring class for the game itself
-        # Generates field, checks for movement opportunities
-        # Follows the state of each object and renders field
         self.grid_size = grid_size
-        self.turns = turns
-        self.walls = self.generate_field(grid_size)
+        self.turns     = turns
+        self.walls     = self.generate_field(grid_size)
 
         hunter_pos, prey_pos = random.sample(self.accessible_tiles, 2)
 
+        wall_map = self.generate_field(grid_size)
+
+        while True:
+            hunter_pos, prey_pos = random.sample(self.accessible_tiles, 2)
+            if self.check_accessibility(wall_map, hunter_pos, prey_pos):
+                break
+
         self.hunter = Player(hunter_pos[0], hunter_pos[1], fov_radius=5, grid_size=grid_size)
-        self.prey = Player(prey_pos[0], prey_pos[1], fov_radius=5, grid_size=grid_size)
+        self.prey   = Player(prey_pos[0],   prey_pos[1],   fov_radius=5, grid_size=grid_size)
 
         self.hunter.update_vision(self.walls)
         self.prey.update_vision(self.walls)
 
     def generate_field(self, size):
-        # Modify p_set to set up what percentage [!walls, walls]
         p_set = 0.8
-        field = np.random.choice([0, 1], size=(size, size), p=[p_set, 1.0-p_set])
+        field = np.random.choice([0, 1], size=(size, size), p=[p_set, 1 - p_set])
         field[0, :] = 1
         field[-1, :] = 1
-        field[:, 0] = 1
+        field[:, 0]  = 1
         field[:, -1] = 1
 
         wall_map = np.full((size, size), ".", dtype=str)
         wall_map[field == 1] = "w"
 
         self.accessible_tiles = [(x, y) for x in range(size) for y in range(size) if wall_map[x][y] == "."]
-
-        while True:
-            hunter_pos, prey_pos = random.sample(self.accessible_tiles, 2)
-            if self.check_accessibility(wall_map, hunter_pos, prey_pos):
-                break
         
-        # The only function here  to tweak is FOV radius, uniquely for each player
-        self.hunter = Player(hunter_pos[0], hunter_pos[1], fov_radius=5, grid_size=size)
-        self.prey   = Player(prey_pos[0],   prey_pos[1],   fov_radius=5, grid_size=size)
         return wall_map.tolist()
 
     def check_accessibility(self, field, start, end):
