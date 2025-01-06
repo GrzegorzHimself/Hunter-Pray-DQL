@@ -6,6 +6,7 @@ import torch.optim as optim
 from collections import deque
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.animation as anime
 import torch.nn.functional as F
 
 
@@ -271,9 +272,25 @@ class Environment:
         print("\n".join(" ".join(row) for row in grid))
         print("-" * 40)
 
+        
+
+def save_animation(frames, filename, fps=5):
+    fig, ax = plt.subplots(figsize=(6, 6))
+    ax.axis("off")
+
+    # Convert each frame into a grid for animation
+    def update(frame):
+        ax.clear()
+        ax.axis("off")
+        ax.imshow(frame, cmap="gray", vmin=0, vmax=2)
+
+    ani = anime.FuncAnimation(fig, update, frames=frames, interval=1000 / fps)
+    ani.save(filename, writer="ffmpeg", fps = 1)
+    print(f"Animation saved as {filename}")
 
 
-def train_hunter(hunter_agent, prey_agent, episodes, grid_size, turns, batch_size, render_on):
+
+def train_hunter(hunter_agent, prey_agent, episodes, grid_size, turns, batch_size, render_on, n_try):
     rewards_hunter = []
 
     for episode in range(episodes):
@@ -281,6 +298,7 @@ def train_hunter(hunter_agent, prey_agent, episodes, grid_size, turns, batch_siz
         state = env.get_state()
         done = False
         total_reward_hunter = 0.0
+        frames = []
 
         for turn in range(turns):
             if done:
@@ -295,10 +313,8 @@ def train_hunter(hunter_agent, prey_agent, episodes, grid_size, turns, batch_siz
             next_state, reward_hunter, _, done = env.step(hunter_action, prey_action)
 
             # Render the step
-            if render_on == True:
-                os.system("cls" if os.name == "nt" else "clear")
-                print(f"Turn: {turn + 1}")
-                env.render()
+            if render_on and episode >= episodes - 5:
+                    frames.append(env.render(return_frame=True))
             
             hunter_agent.replay_buffer.push(
                 state, hunter_action, reward_hunter, next_state, done
@@ -317,11 +333,14 @@ def train_hunter(hunter_agent, prey_agent, episodes, grid_size, turns, batch_siz
 
         print(f"Episode {episode+1} out of {episodes}")
 
+        if render_on and episode >= episodes - 5:
+            save_animation(frames, f"hunter_episode_{n_try+1}_{episode+1}.mp4")
+
     return rewards_hunter
 
 
 
-def train_prey(prey_agent, hunter_agent, episodes, grid_size, turns, batch_size, render_on):
+def train_prey(prey_agent, hunter_agent, episodes, grid_size, turns, batch_size, render_on, n_try):
     rewards_prey = []
 
     for episode in range(episodes):
@@ -329,6 +348,7 @@ def train_prey(prey_agent, hunter_agent, episodes, grid_size, turns, batch_size,
         state = env.get_state()
         done = False
         total_reward_prey = 0.0
+        frames = []
 
         for turn in range(turns):
             if done:
@@ -343,10 +363,8 @@ def train_prey(prey_agent, hunter_agent, episodes, grid_size, turns, batch_size,
             )
 
             # Render the step
-            if render_on == True:
-                os.system("cls" if os.name == "nt" else "clear")
-                print(f"Turn: {turn + 1}")
-                env.render()
+            if render_on and episode >= episodes - 5:
+                    frames.append(env.render(return_frame=True))
 
             prey_agent.train(batch_size)
 
@@ -360,6 +378,9 @@ def train_prey(prey_agent, hunter_agent, episodes, grid_size, turns, batch_size,
         rewards_prey.append(total_reward_prey)
         print(f"Episode {episode+1} out of {episodes}")
 
+        if render_on:
+            save_animation(frames, f"prey_episode_{n_try+1}_{episode+1}.mp4")
+
     return rewards_prey
 
 
@@ -369,11 +390,11 @@ def train_IQL(hunter_agent, prey_agent, episodes_hunter, episodes_prey, grid_siz
     total_reward_prey   = []
     for n_try in range(tries):
         print(f"=== Switching sides! Hunter's turn {n_try+1} ===")
-        rewards_hunter = train_hunter(hunter_agent, prey_agent, episodes_hunter, grid_size, turns, batch_size, render_on)
+        rewards_hunter = train_hunter(hunter_agent, prey_agent, episodes_hunter, grid_size, turns, batch_size, render_on, n_try)
         total_reward_hunter.extend(rewards_hunter)
 
         print(f"=== Switching sides! Prey's turn {n_try+1}! ===")
-        rewards_prey = train_prey(prey_agent, hunter_agent, episodes_prey, grid_size, turns, batch_size, render_on)
+        rewards_prey = train_prey(prey_agent, hunter_agent, episodes_prey, grid_size, turns, batch_size, render_on, n_try)
         total_reward_prey.extend(rewards_prey)
     
     # MatPlotLib graphic output of the training cycle conducted
