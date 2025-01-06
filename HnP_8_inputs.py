@@ -243,8 +243,8 @@ class Environment:
         prey_x, prey_y = self.prey.position
         hunter_sees_prey = 1 if self.hunter.can_see(self.prey.position) else 0
         prey_sees_hunter = 1 if self.prey.can_see(self.hunter.position) else 0
-        dx = abs(hunter_x - prey_x)
-        dy = abs(hunter_y - prey_y)
+        dx = hunter_x - prey_x
+        dy = hunter_y - prey_y
         return np.array([hunter_x, hunter_y, prey_x, prey_y, hunter_sees_prey, prey_sees_hunter, dx, dy], dtype=np.float32)
 
     def step(self, hunter_action, prey_action):
