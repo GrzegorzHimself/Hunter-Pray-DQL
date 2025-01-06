@@ -410,7 +410,7 @@ def train_hunter(hunter_agent, prey_agent, episodes, grid_size, turns, batch_siz
 
         rewards_hunter.append(total_reward_hunter)
 
-        print(f"Episode {episode+1} out of {episodes} (Hunter {n_try})")
+        print(f"Episode {episode+1} out of {episodes} (Hunter {n_try+1})")
 
         if render_on and episode >= episodes - 5:
             save_animation(frames, f"hunter_episode_{n_try+1}_{episode+1}.gif")
@@ -455,7 +455,7 @@ def train_prey(prey_agent, hunter_agent, episodes, grid_size, turns, batch_size,
             prey_agent.update_target_model()
 
         rewards_prey.append(total_reward_prey)
-        print(f"Episode {episode+1} out of {episodes} (Prey {n_try})")
+        print(f"Episode {episode+1} out of {episodes} (Prey {n_try+1})")
 
         if render_on and episode >= episodes - 5:
             save_animation(frames, f"prey_episode_{n_try+1}_{episode+1}.gif")
