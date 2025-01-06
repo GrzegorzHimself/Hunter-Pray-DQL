@@ -10,15 +10,17 @@ import torch.nn.functional as F
 
 
 
-device = torch.device("cuda")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 
+# ------------------- REPLAY BUFFER ------------------- #
 class ReplayBuffer:
     def __init__(self, capacity):
         self.buffer = deque(maxlen=capacity)
 
     def push(self, state, action, reward, next_state, done):
+        # Replay buffer setup for shuffle and mini-batch creation
         self.buffer.append((state, action, reward, next_state, done))
 
     def sample(self, batch_size):
@@ -37,6 +39,7 @@ class ReplayBuffer:
 
 
 
+# ------------------- DQN NETWORK ------------------- #
 class DQN(nn.Module):
     def __init__(self, input_dim, output_dim):
         super(DQN, self).__init__()
@@ -45,12 +48,13 @@ class DQN(nn.Module):
         self.fc3 = nn.Linear(128, output_dim)
 
     def forward(self, x):
-        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc1(x))     # I love ReLU
         x = F.relu(self.fc2(x))
         return self.fc3(x)
 
 
 
+# ------------------- AGENT ------------------- #
 class Agent:
     def __init__(self, input_dim, n_actions, gamma=0.99, epsilon=1.0, epsilon_decay=0.995, epsilon_min=0.1, lr=0.001):
         self.n_actions = n_actions
@@ -62,6 +66,7 @@ class Agent:
         self.target_model = DQN(input_dim, n_actions).to(device)
         self.target_model.load_state_dict(self.model.state_dict())
         self.target_model.eval()
+# Nice
         self.optimizer = optim.Adam(self.model.parameters(), lr=lr)
         self.criterion = nn.MSELoss()
         self.replay_buffer = ReplayBuffer(10000)
@@ -71,10 +76,10 @@ class Agent:
             # Random action, exploration
             return random.randint(0, self.n_actions - 1)
         else:
+            # Exploitation
             with torch.no_grad():
                 state_tensor = torch.tensor(state, dtype=torch.float32).unsqueeze(0).to(device)
                 q_values = self.model(state_tensor)
-                # Exploitation
                 return torch.argmax(q_values).item()
 
     def update_target_model(self):
@@ -106,6 +111,7 @@ class Agent:
 
 
 
+# ------------------- PLAYER ------------------- #
 class Player:
     def __init__(self, x, y, fov_radius, grid_size):
         self.position = [x, y]
@@ -114,25 +120,25 @@ class Player:
         self.vision = []
 
     def move(self, direction, walls):
+        # Both Hunter and Prey can move only UP, DOWN, RIGHT, LEFT, and STAY (in place, basically skipping the step)
         x, y = self.position
-        # UP
         if direction == 0 and x > 0 and walls[x - 1][y] != "w":
-            x -= 1
-        # DOWN
+            x -= 1      # UP
         elif direction == 1 and x < self.grid_size - 1 and walls[x + 1][y] != "w":
-            x += 1
-        # LEFT
+            x += 1      # DOWN
         elif direction == 2 and y > 0 and walls[x][y - 1] != "w":
-            y -= 1
-        # RIGHT
+            y -= 1      # LEFT
         elif direction == 3 and y < self.grid_size - 1 and walls[x][y + 1] != "w":
-            y += 1
-        # STAY
+            y += 1      # RIGHT
         elif direction == 4:
-            pass
+            pass        # STAY
         self.position = [x, y]
         self.update_vision(walls)
 
+    # Vision tool using Bresenham's line algorithm
+    # Provides Hunter and Pray with a FOV (Field Of View) circle
+    # In this circle, they "see" each other (see *move* function for details)
+    # Walls block the circle, thus limiting the FOV
     def update_vision(self, walls):
         hx, hy = self.position
         self.vision = []
@@ -176,8 +182,12 @@ class Player:
 
 
 
+# ------------------- ENVIRONMENT ------------------- #
 class Environment:
     def __init__(self, grid_size, turns):
+        # Declaring class for the game itself
+        # Generates field, checks for movement opportunities
+        # Follows the state of each object and renders field
         self.grid_size = grid_size
         self.turns = turns
         self.walls = self.generate_field(grid_size)
@@ -192,7 +202,7 @@ class Environment:
 
     def generate_field(self, size):
         # Modify p_set to set up what percentage [!walls, walls]
-        p_set = 1.0
+        p_set = 0.8
         field = np.random.choice([0, 1], size=(size, size), p=[p_set, 1.0-p_set])
         field[0, :] = 1
         field[-1, :] = 1
@@ -208,9 +218,10 @@ class Environment:
             hunter_pos, prey_pos = random.sample(self.accessible_tiles, 2)
             if self.check_accessibility(wall_map, hunter_pos, prey_pos):
                 break
-
+        
+        # The only function here  to tweak is FOV radius, uniquely for each player
         self.hunter = Player(hunter_pos[0], hunter_pos[1], fov_radius=5, grid_size=size)
-        self.prey = Player(prey_pos[0], prey_pos[1], fov_radius=5, grid_size=size)
+        self.prey   = Player(prey_pos[0],   prey_pos[1],   fov_radius=5, grid_size=size)
         return wall_map.tolist()
 
     def check_accessibility(self, field, start, end):
@@ -249,9 +260,7 @@ class Environment:
             reward_prey   = +0.1
             done = False
 
-
         return self.get_state(), reward_hunter, reward_prey, done
-    
     
     def render(self):
         grid = [row[:] for row in self.walls]
@@ -264,85 +273,152 @@ class Environment:
 
 
 
-def train_Environment(episodes, grid_size, turns, batch_size, target_update_interval=10):
-    hunter_agent = Agent(input_dim=8, n_actions=5)
-    prey_agent = Agent(input_dim=8, n_actions=5)
-
+def train_hunter(hunter_agent, prey_agent, episodes, grid_size, turns, batch_size, render_on):
     rewards_hunter = []
+
+    for episode in range(episodes):
+        env = Environment(grid_size+2, turns)
+        state = env.get_state()
+        done = False
+        total_reward_hunter = 0.0
+
+        for turn in range(turns):
+            if done:
+                break
+
+            hunter_action = hunter_agent.predict(state)
+            if len(prey_agent.replay_buffer) < 500:
+                prey_action = random.randint(0, 4)
+            else:
+                prey_action = prey_agent.predict(state)
+
+            next_state, reward_hunter, _, done = env.step(hunter_action, prey_action)
+
+            # Render the step
+            if render_on == True:
+                os.system("cls" if os.name == "nt" else "clear")
+                print(f"Turn: {turn + 1}")
+                env.render()
+            
+            hunter_agent.replay_buffer.push(
+                state, hunter_action, reward_hunter, next_state, done
+            )
+
+            hunter_agent.train(batch_size)
+
+            state = next_state
+            total_reward_hunter += reward_hunter
+
+        hunter_agent.epsilon = max(hunter_agent.epsilon_min, hunter_agent.epsilon * hunter_agent.epsilon_decay)
+        if (episode + 1) % 10 == 0:
+            hunter_agent.update_target_model()
+
+        rewards_hunter.append(total_reward_hunter)
+
+        print(f"Episode {episode+1} out of {episodes}")
+
+    return rewards_hunter
+
+
+
+def train_prey(prey_agent, hunter_agent, episodes, grid_size, turns, batch_size, render_on):
     rewards_prey = []
 
     for episode in range(episodes):
         env = Environment(grid_size, turns)
-
-        done = False
-        total_reward_hunter = 0.0
-        total_reward_prey = 0.0
         state = env.get_state()
+        done = False
+        total_reward_prey = 0.0
 
-        print(f"Starting Episode {episode + 1}/{episodes}")
-        
         for turn in range(turns):
-            os.system("cls" if os.name == "nt" else "clear")
             if done:
                 break
-            
-            # Action pick
+
             hunter_action = hunter_agent.predict(state)
-            prey_action = prey_agent.predict(state)
-            # Step settings
-            next_state, reward_hunter, reward_prey, done = env.step(hunter_action, 4)
+            prey_action   = prey_agent.predict(state)
 
-            # Map visualisation
-            print(f"Turn: {turn + 1}")
-            env.render()
-            # Total rewards update
-            
-            total_reward_hunter += reward_hunter
-            total_reward_prey += reward_prey
+            next_state, _, reward_prey, done = env.step(hunter_action, prey_action)
+            prey_agent.replay_buffer.push(
+                state, prey_action, reward_prey, next_state, done
+            )
 
-            print(f"Hunter action: {hunter_action}, Prey action: {prey_action}")
-            print(f"Hunter step reward: {reward_hunter:.2f}, Prey step reward: {reward_prey:.2f}")
-            print(f"Total hunter reward: {total_reward_hunter:.2f}, total prey reward: {total_reward_prey:.2f}")
+            # Render the step
+            if render_on == True:
+                os.system("cls" if os.name == "nt" else "clear")
+                print(f"Turn: {turn + 1}")
+                env.render()
 
-            print(f"Episode {episode + 1}/{episodes}, "
-                f"Epsilon_hunter: {hunter_agent.epsilon:.2f}, "
-                f"Epsilon_prey: {prey_agent.epsilon:.2f}")
-            
-            # Buffer update
-            hunter_agent.replay_buffer.push(state, hunter_action, reward_hunter, next_state, done)
-            prey_agent.replay_buffer.push(state, prey_action, reward_prey, next_state, done)
-
-
-            # Agent trains here
-            hunter_agent.train(batch_size)
             prey_agent.train(batch_size)
 
             state = next_state
+            total_reward_prey += reward_prey
 
-        rewards_hunter.append(total_reward_hunter)
-        rewards_prey.append(total_reward_prey)
-
-        # Target model update
-        if episode % target_update_interval == 0:
-            hunter_agent.update_target_model()
+        prey_agent.epsilon = max(prey_agent.epsilon_min, prey_agent.epsilon * prey_agent.epsilon_decay)
+        if (episode + 1) % 10 == 0:
             prey_agent.update_target_model()
 
-        # Epsilon update
-        hunter_agent.epsilon = max(hunter_agent.epsilon_min, hunter_agent.epsilon * hunter_agent.epsilon_decay)
-        prey_agent.epsilon = max(prey_agent.epsilon_min, prey_agent.epsilon * prey_agent.epsilon_decay)
+        rewards_prey.append(total_reward_prey)
+        print(f"Episode {episode+1} out of {episodes}")
 
-    plt.figure(figsize=(10, 6))
+    return rewards_prey
 
-    plt.plot(rewards_hunter, label='Hunter total reward', color='blue', alpha=0.6)
-    plt.plot(rewards_prey,   label='Prey total reward',   color='red',  alpha=0.6)
 
+
+def train_IQL(hunter_agent, prey_agent, episodes_hunter, episodes_prey, grid_size, turns, batch_size, tries, render_on):
+    total_reward_hunter = []
+    total_reward_prey   = []
+    for n_try in range(tries):
+        print(f"=== Switching sides! Hunter's turn {n_try+1} ===")
+        rewards_hunter = train_hunter(hunter_agent, prey_agent, episodes_hunter, grid_size, turns, batch_size, render_on)
+        total_reward_hunter.extend(rewards_hunter)
+
+        print(f"=== Switching sides! Prey's turn {n_try+1}! ===")
+        rewards_prey = train_prey(prey_agent, hunter_agent, episodes_prey, grid_size, turns, batch_size, render_on)
+        total_reward_prey.extend(rewards_prey)
+    
+    # MatPlotLib graphic output of the training cycle conducted
+    plt.figure(figsize=(10, 5))
+    # Plot Hunter rewards
+    plt.subplot(1, 2, 1)
+    plt.scatter(range(len(total_reward_hunter)), total_reward_hunter, label="Hunter", color='#0E0598', s=10)
     plt.xlabel("Episode")
     plt.ylabel("Reward")
-    plt.title("Training Progress")
+    plt.title(f"IQL Hunter:\nGrid {grid_size}x{grid_size}; Turns {turns}; Episodes {episodes_hunter*tries*2}; FOV 5")
     plt.legend()
     plt.grid(True)
+    # Plot Prey rewards
+    plt.subplot(1, 2, 2)
+    plt.scatter(range(len(total_reward_prey)), total_reward_prey, label="Prey", color='xkcd:baby poop green', s=10)
+    plt.xlabel("Episode")
+    plt.ylabel("Reward")
+    plt.title(f"IQL Prey:\nGrid {grid_size}x{grid_size}; Turns {turns}; Episodes {episodes_hunter*tries*2}; FOV 5")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
     plt.show()
 
 
 
-train_Environment(episodes=3000, grid_size=8, turns=50, batch_size=32)
+if __name__ == "__main__":
+    hunter_agent = Agent(input_dim=8, n_actions=5)
+    prey_agent   = Agent(input_dim=8, n_actions=5)
+
+    # === SETTINGS === #
+    #
+    # episodes_hunter, episodes_prey -- Setup Hunter and Prey episodes for their unique 
+    #                                   trainings (SHOULD BE EQUAL)
+    # grid_size                      -- set up the grid size of the map.
+    #                                   Do not compensate for walls, they are accounted for in the logic
+    # turns                          -- accounted for automatically
+    # batch size                     -- setup the batch size
+    # tries                          -- the number of cycles both of the models train
+    # render_on                      -- if you want to turn the render of the field on to see the process of training
+    #                                   May significantly impact the speed of the training
+    train_IQL(hunter_agent, prey_agent,
+              episodes_hunter=1000,
+              episodes_prey=1000,
+              grid_size=20,
+              turns=int(20*20*0.75),
+              batch_size=32,
+              tries = 3,
+              render_on = False)
