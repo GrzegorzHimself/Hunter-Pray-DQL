@@ -264,7 +264,7 @@ class Environment:
             reward_prey = 0.0
             done = True
 
-        return reward_hunter, reward_prey, done
+        return self.get_state(), reward_hunter, reward_prey, done
     
     def render(self, return_frame=False):
         grid = [row[:] for row in self.walls]
