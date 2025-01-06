@@ -277,7 +277,7 @@ def train_hunter(hunter_agent, prey_agent, episodes, grid_size, turns, batch_siz
     rewards_hunter = []
 
     for episode in range(episodes):
-        env = Environment(grid_size+2, turns)
+        env = Environment(grid_size, turns)
         state = env.get_state()
         done = False
         total_reward_hunter = 0.0
@@ -391,8 +391,8 @@ def train_IQL(hunter_agent, prey_agent, episodes_hunter, episodes_prey, grid_siz
     # Plot Prey rewards
     plt.subplot(1, 2, 2)
     plt.scatter(range(len(total_reward_prey)), total_reward_prey, label="Prey", color='xkcd:baby poop green', s=10)
-    avg_prey = [np.mean(total_reward_prey[max(0, i-50):i+1]) for i in range(len(total_reward_prey))]
-    plt.plot(range(len(total_reward_prey)), avg_prey, color='pink', label="Prey Avg (50)")
+    rolling_avg_prey = [np.mean(total_reward_prey[max(0, i-50):i+1]) for i in range(len(total_reward_prey))]
+    plt.plot(range(len(total_reward_prey)), rolling_avg_prey, color='green', label="Prey Avg (50)")
     plt.xlabel("Episode")
     plt.ylabel("Reward")
     plt.title(f"IQL Prey:\nGrid {grid_size}x{grid_size}; Turns {turns}; Episodes {episodes_hunter*tries*2}; FOV 5")
@@ -412,7 +412,7 @@ if __name__ == "__main__":
     # episodes_hunter, episodes_prey -- Setup Hunter and Prey episodes for their unique 
     #                                   trainings (SHOULD BE EQUAL)
     # grid_size                      -- set up the grid size of the map.
-    #                                   Do not compensate for walls, they are accounted for in the logic
+    #                                   Do not compensate for walls (+2), they are not accounted for in the logic
     # turns                          -- accounted for automatically
     # batch size                     -- setup the batch size
     # tries                          -- the number of cycles both of the models train
