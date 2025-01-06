@@ -256,6 +256,9 @@ class Environment:
         return np.array([hunter_x, hunter_y, prey_x, prey_y, hunter_sees_prey, prey_sees_hunter, dx, dy], dtype=np.float32)
 
     def step(self, hunter_action, prey_action):
+        reward_hunter = 0
+        reward_prey   = 0
+        done = False
         self.hunter.move(hunter_action, self.walls)
 
         if self.hunter.position == self.prey.position:
