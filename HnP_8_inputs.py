@@ -7,6 +7,7 @@ from collections import deque
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as anime
+from matplotlib.animation import PillowWriter
 import torch.nn.functional as F
 
 
@@ -277,18 +278,31 @@ class Environment:
 
         
 
-def save_animation(frames, filename, fps=5):
+def save_animation(frames, filename, fps=12):
+    def frame_to_numeric(frame):
+        mapping = {
+            ".": 8,   # Empty space
+            "w": 0,   # Wall
+            "H": 1,   # Hunter
+            "P": 2    # Prey
+        }
+        return np.vectorize(mapping.get)(frame)
     fig, ax = plt.subplots(figsize=(6, 6))
     ax.axis("off")
 
-    # Convert each frame into a grid for animation
+    # Convert each frame into a grid animation can process
     def update(frame):
         ax.clear()
         ax.axis("off")
-        ax.imshow(frame, cmap="gray", vmin=0, vmax=2)
+        numeric_frame = frame_to_numeric(frame)
+        ax.imshow(numeric_frame, cmap="gray", vmin=0, vmax=3)
+
+    if frames:
+        frames.extend([frames[-1]] * int(3 * fps))
 
     ani = anime.FuncAnimation(fig, update, frames=frames, interval=1000 / fps)
-    ani.save(filename, writer="ffmpeg", fps = 1)
+    writer = PillowWriter(fps=fps)
+    ani.save(filename, writer = writer)
     print(f"Animation saved as {filename}")
 
 
@@ -337,7 +351,7 @@ def train_hunter(hunter_agent, prey_agent, episodes, grid_size, turns, batch_siz
         print(f"Episode {episode+1} out of {episodes}")
 
         if render_on and episode >= episodes - 5:
-            save_animation(frames, f"hunter_episode_{n_try+1}_{episode+1}.mp4")
+            save_animation(frames, f"hunter_episode_{n_try+1}_{episode+1}.gif")
 
     return rewards_hunter
 
@@ -381,8 +395,8 @@ def train_prey(prey_agent, hunter_agent, episodes, grid_size, turns, batch_size,
         rewards_prey.append(total_reward_prey)
         print(f"Episode {episode+1} out of {episodes}")
 
-        if render_on:
-            save_animation(frames, f"prey_episode_{n_try+1}_{episode+1}.mp4")
+        if render_on and episode >= episodes - 5:
+            save_animation(frames, f"prey_episode_{n_try+1}_{episode+1}.gif")
 
     return rewards_prey
 
