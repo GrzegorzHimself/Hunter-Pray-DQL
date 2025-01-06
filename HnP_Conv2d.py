@@ -331,18 +331,18 @@ class Environment:
         self.hunter.move(hunter_action, self.walls)
 
         if self.hunter.position == self.prey.position:
-            reward_hunter = 30.0
-            reward_prey   = -30.0
+            reward_hunter = +30.0
+            reward_prey   = -50.0
             done = True
             return reward_hunter, reward_prey, done
-        
+
         self.prey.move(prey_action, self.walls)
         dist = a_star_distance(self.walls, tuple(self.hunter.position),
                                tuple(self.prey.position), self.grid_size)
         
         if self.hunter.position != self.prey.position and dist is not None:
             reward_hunter = -0.1*dist
-            reward_prey   = +0.1*dist
+            reward_prey   = +0.2*dist
             done = False
         else:
             if hunter_action in [0,1,2,3]:
