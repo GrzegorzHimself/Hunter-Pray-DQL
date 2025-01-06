@@ -339,7 +339,7 @@ class Environment:
             reward_prey   = +0.1*dist
             done = False
         else:
-            reward_hunter, reward_prey = 0
+            reward_hunter, reward_prey = 0.0
             done = True
 
         return reward_hunter, reward_prey, done
