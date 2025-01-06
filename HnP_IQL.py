@@ -208,6 +208,7 @@ class Environment:
         self.prey.update_vision(self.walls)
 
     def generate_field(self, size):
+        # Modify p_set to set up what percentage [!walls, walls]
         p_set = 0.8
         field = np.random.choice([0, 1], size=(size, size), p=[p_set, 1 - p_set])
         field[0, :] = 1
