@@ -265,6 +265,7 @@ class Environment:
             reward_hunter = +30.0
             reward_prey   = -30.0
             done = True
+            return reward_hunter, reward_prey, done
 
         self.prey.move(prey_action, self.walls)
         dist = a_star_distance(self.walls, tuple(self.hunter.position),
@@ -281,7 +282,7 @@ class Environment:
         if hunter_action == 4:  # STAY
             reward_hunter -= 0.5
 
-        return self.get_state(), reward_hunter, reward_prey, done
+        return reward_hunter, reward_prey, done
     
     def render(self, return_frame=False):
         grid = [row[:] for row in self.walls]
@@ -389,7 +390,8 @@ def train_hunter(hunter_agent, prey_agent, episodes, grid_size, turns, batch_siz
             else:
                 prey_action = prey_agent.predict(state)
 
-            next_state, reward_hunter, _, done = env.step(hunter_action, prey_action)
+            reward_hunter, _, done = env.step(hunter_action, prey_action)
+            next_state = env.get_state()
 
             # Render the step
             if render_on and episode >= episodes - 5:
