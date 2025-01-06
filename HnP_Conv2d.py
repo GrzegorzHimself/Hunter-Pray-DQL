@@ -326,14 +326,16 @@ class Environment:
 
     def step(self, hunter_action, prey_action):
         self.hunter.move(hunter_action, self.walls)
-        self.prey.move(prey_action, self.walls)
-        dist = a_star_distance(self.walls, tuple(self.hunter.position),
-                               tuple(self.prey.position), self.grid_size)
 
         if self.hunter.position == self.prey.position:
             reward_hunter = 30.0
             reward_prey   = -30.0
             done = True
+        
+        self.prey.move(prey_action, self.walls)
+        dist = a_star_distance(self.walls, tuple(self.hunter.position),
+                               tuple(self.prey.position), self.grid_size)
+        
         if self.hunter.position != self.prey.position and dist is not None:
             reward_hunter = -0.1*dist
             reward_prey   = +0.1*dist
