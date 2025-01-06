@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as anime
 from matplotlib.animation import PillowWriter
 import torch.nn.functional as F
+import heapq
 
 
 
@@ -58,7 +59,7 @@ class DQN(nn.Module):
 
 # ------------------- AGENT ------------------- #
 class Agent:
-    def __init__(self, input_dim, n_actions, gamma=0.995, epsilon=1.0, epsilon_decay=0.95, epsilon_min=0.1, lr=0.001):
+    def __init__(self, input_dim, n_actions, gamma=0.99, epsilon=1.0, epsilon_decay=0.995, epsilon_min=0.1, lr=0.001):
         self.n_actions = n_actions
         self.gamma = gamma
         self.epsilon = epsilon
@@ -247,17 +248,22 @@ class Environment:
     def step(self, hunter_action, prey_action):
         self.hunter.move(hunter_action, self.walls)
         self.prey.move(prey_action, self.walls)
+        dist = a_star_distance(self.walls, tuple(self.hunter.position),
+                               tuple(self.prey.position), self.grid_size)
 
         if self.hunter.position == self.prey.position:
-            reward_hunter = +10.0
-            reward_prey   = -10.0
+            reward_hunter = +30
+            reward_prey   = -20.0
             done = True
-        else:
-            reward_hunter = -0.1
-            reward_prey   = +0.1
+        if dist is not None:
+            reward_hunter = -0.1*dist
+            reward_prey   = +0.1*dist
             done = False
+        else:
+            reward_hunter, reward_prey = 0
+            done = True
 
-        return self.get_state(), reward_hunter, reward_prey, done
+        return reward_hunter, reward_prey, done
     
     def render(self, return_frame=False):
         grid = [row[:] for row in self.walls]
@@ -271,6 +277,46 @@ class Environment:
             os.system("cls" if os.name == "nt" else "clear")
             print("\n".join(" ".join(row) for row in grid))
             print("-" * 40)
+
+
+
+def a_star_distance(walls, start, goal, grid_size):
+    # Returns the length of the shortest path from 'start' to 'goal' in terms of number of steps
+    # Or None if there is no path
+    # If start is the target = 0
+    if start == goal:
+        return 0
+
+    (sx, sy) = start
+    (gx, gy) = goal
+
+    if walls[sx][sy] == "w" or walls[gx][gy] == "w":
+        return None
+    open_set = []
+    heapq.heappush(open_set, (0, sx, sy))
+    came_from = {}
+    cost_so_far = {(sx, sy): 0}
+
+    def heuristic(ax, ay, bx, by):
+        return abs(ax - bx) + abs(ay - by)
+
+    while open_set:
+        priority, cx, cy = heapq.heappop(open_set)
+
+        if (cx, cy) == (gx, gy):
+            return cost_so_far[(cx, cy)]
+
+        for dx, dy in [(-1,0),(1,0),(0,-1),(0,1)]:
+            nx, ny = cx + dx, cy + dy
+            if 0 <= nx < grid_size and 0 <= ny < grid_size:
+                if walls[nx][ny] == ".":
+                    new_cost = cost_so_far[(cx, cy)] + 1
+                    if (nx, ny) not in cost_so_far or new_cost < cost_so_far[(nx, ny)]:
+                        cost_so_far[(nx, ny)] = new_cost
+                        priority = new_cost + heuristic(nx, ny, gx, gy)
+                        heapq.heappush(open_set, (priority, nx, ny))
+                        
+    return None
 
         
 
@@ -415,7 +461,7 @@ def train_IQL(hunter_agent, prey_agent, episodes_hunter, episodes_prey, grid_siz
     plt.figure(figsize=(10, 5))
     # Plot Hunter rewards
     plt.subplot(1, 2, 1)
-    plt.scatter(range(len(total_reward_hunter)), total_reward_hunter, label="Hunter", color='#0E0598', s=10)
+    plt.scatter(range(len(total_reward_hunter)), total_reward_hunter, label="Hunter", color='#0E0598', s=5)
     avg_hunter = [np.mean(total_reward_hunter[max(0, i-50):i+1]) for i in range(len(total_reward_hunter))]
     plt.plot(range(len(total_reward_hunter)), avg_hunter, color='orange', label="Hunter Avg (50)")
     plt.xlabel("Episode")
@@ -425,7 +471,7 @@ def train_IQL(hunter_agent, prey_agent, episodes_hunter, episodes_prey, grid_siz
     plt.grid(True)
     # Plot Prey rewards
     plt.subplot(1, 2, 2)
-    plt.scatter(range(len(total_reward_prey)), total_reward_prey, label="Prey", color='xkcd:baby poop green', s=10)
+    plt.scatter(range(len(total_reward_prey)), total_reward_prey, label="Prey", color='xkcd:baby poop green', s=5)
     rolling_avg_prey = [np.mean(total_reward_prey[max(0, i-50):i+1]) for i in range(len(total_reward_prey))]
     plt.plot(range(len(total_reward_prey)), rolling_avg_prey, color='green', label="Prey Avg (50)")
     plt.xlabel("Episode")
