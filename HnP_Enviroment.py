@@ -185,10 +185,11 @@ class Environment:
             if prey_patch[int(rel_x), int(rel_y)] == 1.0:
                 step_reward_prey -= 5.0
 
-        # Normalise Prey reward to [0, 30]:
-        step_reward_prey = max(0, min(step_reward_prey, 30))
-
         self.cumulative_reward_prey += step_reward_prey
+        
+        # Normalise Prey reward to [0, 30]:
+        self.cumulative_reward_prey = max(0, min(self.cumulative_reward_prey, 30))
+        
         reward_prey = step_reward_prey
         
         return reward_hunter, reward_prey, done
