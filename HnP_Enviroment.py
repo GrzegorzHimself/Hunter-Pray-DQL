@@ -1,0 +1,291 @@
+import random
+import os
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.animation as anime
+from matplotlib.animation import PillowWriter
+from matplotlib.colors import ListedColormap
+
+from Hnp_Player import *
+from HnP_Pathfinding import a_star_distance_modified
+
+
+# ------------------- ENVIRONMENT ------------------- #
+
+class Environment:
+    def __init__(self, grid_size, turns):
+        self.grid_size = grid_size
+        self.turns = turns
+        
+        # Accumulate rewards per episode
+        self.cumulative_reward_hunter = 0.0
+        self.cumulative_reward_prey = 0.0
+        
+        # Generating a randomised field
+        while True:
+            wall_map = self.generate_field(grid_size)
+            hunter_pos, prey_pos = self.pick_positions(wall_map)
+            if hunter_pos is not None and prey_pos is not None:
+                break
+                
+        self.walls = wall_map
+        fov = int(np.sqrt((grid_size ** 2) * 2))
+        self.hunter = Player(hunter_pos[0], hunter_pos[1], fov_radius=fov, grid_size=grid_size)
+        self.prey = Player(prey_pos[0], prey_pos[1], fov_radius=fov, grid_size=grid_size)
+        
+    def generate_field(self, size):
+        """Generates the playground field with randomized walls
+
+        Args:
+            size (int): The size*size parameter for the playground generation
+
+        Returns:
+            list: The map grid
+        """
+        p_set = 0.8
+        field = np.random.choice([0, 1], size=(size, size), p=[p_set, 1 - p_set])
+        field[0, :] = 1
+        field[-1, :] = 1
+        field[:, 0] = 1
+        field[:, -1] = 1
+        wall_map = np.full((size, size), ".", dtype=str)
+        wall_map[field == 1] = "w"
+        self.accessible_tiles = [(x, y) for x in range(size) for y in range(size) if wall_map[x][y] == "."]
+        return wall_map.tolist()
+    
+    def pick_positions(self, wall_map):
+        """Picks a random position on the map and returns Hunter and Prey position
+        None if the position does not pass the check_accessibility test
+
+        Args:
+            wall_map (list): The playground with walls 
+
+        Returns:
+            list, list: If accessible, Hunter position, Prey position. (None, None) if not accesible
+        """
+        if len(self.accessible_tiles) < 2:
+            return None, None
+        for attempt in range(100):
+            hunter_pos, prey_pos = random.sample(self.accessible_tiles, 2)
+            if self.check_accessibility(wall_map, hunter_pos, prey_pos):
+                return hunter_pos, prey_pos
+        return None, None
+    
+    def check_accessibility(self, field, start, end):
+        queue = [start]
+        visited = set()
+        while queue:
+            x, y = queue.pop(0)
+            if (x, y) == end:
+                return True
+            for dx, dy in [(-1,0), (1,0), (0,-1), (0,1)]:
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < len(field) and 0 <= ny < len(field[0]) and (nx, ny) not in visited and field[nx][ny] == ".":
+                    queue.append((nx, ny))
+                    visited.add((nx, ny))
+        return False
+    
+    def get_state(self):
+        """The state is grouped of:
+            - 8 basic features: [hunter_x, hunter_y, prey_x, prey_y, hunter_sees_prey, prey_sees_hunter, dx, dy]
+            - The Hunter's local view (a 5x5 patch, 25 elements)
+            - The Prey's local view (a 5x5 patch, 25 elements)
+        The resulting vector has a size of 8 + 25 + 25 = 58
+
+        Returns:
+            ndarray: Current model state
+        """
+        self.hunter.update_vision(self.walls)
+        self.prey.update_vision(self.walls)
+        
+        hunter_x, hunter_y = self.hunter.position
+        prey_x, prey_y = self.prey.position
+        
+        # Does Hunter sees Prey
+        if (prey_x, prey_y) in self.hunter.vision:
+            hunter_sees_prey = 1
+            visible_prey_x = prey_x
+            visible_prey_y = prey_y
+        else:
+            hunter_sees_prey = 0
+            visible_prey_x = -1
+            visible_prey_y = -1
+
+        # Does Prey sees Hunter
+        if (hunter_x, hunter_y) in self.prey.vision:
+            prey_sees_hunter = 1
+        else:
+            prey_sees_hunter = 0
+
+        # If at least one edoesn't see, the difference will be 0
+        if hunter_sees_prey and prey_sees_hunter:
+            dx = hunter_x - prey_x
+            dy = hunter_y - prey_y
+        else:
+            dx = 0
+            dy = 0
+
+        base_state = np.array([hunter_x, hunter_y, visible_prey_x, visible_prey_y,
+                            hunter_sees_prey, prey_sees_hunter, dx, dy], dtype=np.float32)
+        hunter_patch = self.hunter.get_local_view(self.walls, patch_radius=2)
+        prey_patch = self.prey.get_local_view(self.walls, patch_radius=2)
+        full_state = np.concatenate([base_state, hunter_patch, prey_patch])
+        return full_state
+    
+    def step(self, hunter_action, prey_action):
+        """Reward logic with the accumulation of shaping rewards:
+         -  If the hunter catches the prey, the final reward for the hunter is +30 + cumulative_reward,
+            for the prey it is -cumulative_reward, and the episode terminates
+         -  If not done, Hunter receives 0, and Prey receives a shaping reward
+            (the distance computed using a_star_distance_modified with a possible penalty if Hunter is within Prey's field of view)
+
+        Args:
+            hunter_action (RNNAgent): Predicted action for Hunter
+            prey_action (RNNAgent): Predicted action for Prey
+
+        Returns:
+            float, float, bool: Hunter and Prey reward and a status check for in the game is over due to Catch
+        """
+        done = False
+
+        # Hunter step
+        self.hunter.move(hunter_action, self.walls)
+        if self.hunter.position == self.prey.position:
+            reward_hunter = 30.0 + self.cumulative_reward_hunter
+            reward_prey = -self.cumulative_reward_prey
+            done = True
+            self.cumulative_reward_hunter = 0.0
+            self.cumulative_reward_prey = 0.0
+            return reward_hunter, reward_prey, done
+
+        # Prey step
+        self.prey.move(prey_action, self.walls)
+        if self.hunter.position == self.prey.position:
+            reward_hunter = 30.0 + self.cumulative_reward_hunter
+            reward_prey = -self.cumulative_reward_prey
+            done = True
+            self.cumulative_reward_hunter = 0.0
+            self.cumulative_reward_prey = 0.0
+            return reward_hunter, reward_prey, done
+        
+        reward_hunter = 0.0
+        dist = a_star_distance_modified(self.walls, tuple(self.hunter.position),
+                                        tuple(self.prey.position), self.grid_size)
+        if dist is not None:
+            step_reward_prey = dist
+        else:
+            step_reward_prey = 0.0
+
+        # If Prey sees Hunter => punish Prey:
+        prey_patch = self.prey.get_local_view(self.walls, patch_radius=2).reshape(5, 5)
+        cx, cy = self.prey.position
+        rel_x = self.hunter.position[0] - cx + 2
+        rel_y = self.hunter.position[1] - cy + 2
+        if 0 <= rel_x < 5 and 0 <= rel_y < 5:
+            if prey_patch[int(rel_x), int(rel_y)] == 1.0:
+                step_reward_prey -= 5.0
+
+        # Normalise Prey reward to [0, 30]:
+        step_reward_prey = max(0, min(step_reward_prey, 30))
+
+        self.cumulative_reward_prey += step_reward_prey
+        reward_prey = step_reward_prey
+        
+        return reward_hunter, reward_prey, done
+    
+    def render(self, return_frame=False):
+        """Visualisaton function to output thee process into comprnhensive concole view
+
+        Args:
+            return_frame (bool, optional): Switch if it needs to return the frame-by-frame render. Defaults to False.
+
+        Returns:
+            ndarray: An array representation of the current game state
+        """
+        # Before renderind, update visualisation for both players
+        self.hunter.update_vision(self.walls)
+        self.prey.update_vision(self.walls)
+        
+        # Build visualisation field
+        grid = [row[:] for row in self.walls]
+        # Map the players
+        hx, hy = self.hunter.position
+        px, py = self.prey.position
+        grid[hx][hy] = "H"
+        grid[px][py] = "P"
+        
+        # Visualise Hunter FOV as "p"
+        for (x, y) in self.hunter.vision:
+            if grid[x][y] == ".":
+                grid[x][y] = "h"
+        
+        # Visualise Prey FOV as "p"
+        for (x, y) in self.prey.vision:
+            if grid[x][y] == ".":
+                # If FOVs overlap, mark as "x"
+                grid[x][y] = "p" if grid[x][y] != "h" else "x"
+        
+        if return_frame:
+            return np.array(grid)
+        else:
+            os.system("cls" if os.name == "nt" else "clear")
+            for row in grid:
+                print(" ".join(row))
+            print("-" * 40)
+
+
+def save_animation(frames, filename, fps=12):
+    """Processes rendered console output into a matplotlib frame
+
+    Args:
+        frames (int): Number of frames in the animation
+        filename (str): Name of the animation file
+        fps (int, optional): FPS settings. Defaults to 12.
+    """
+    # Remap:
+    # "." (clear field) -> 0
+    # "w" (wall) -> 1
+    # "H" (Hunter) -> 2
+    # "P" (Prey) -> 3
+    # "h" (Hunter FOV) -> 4
+    # "p" (Prey FOV) -> 5
+    # "x" (overlaping FOV) -> 6
+    mapping = {
+        ".": 0,
+        "w": 1,
+        "H": 2,
+        "P": 3,
+        "h": 4,
+        "p": 5,
+        "x": 6
+    }
+    
+    # Custom colors:
+    # 0: white, 1: black, 2: red, 3: blue, 4: orange, 5: cyan, 6: magenta
+    cmap = ListedColormap(['white', 'black', 'red', 'blue', 'orange', 'cyan', 'magenta'])
+    
+    # Symbols to numbers
+    def frame_to_numeric(frame):
+        return np.vectorize(mapping.get)(frame)
+    
+    fig, ax = plt.subplots(figsize=(6, 6))
+    ax.axis("off")
+    
+    # Add a frame
+    def update(frame):
+        ax.clear()
+        ax.axis("off")
+        numeric_frame = frame_to_numeric(frame)
+        # Используем нашу палитру, значения от 0 до 6
+        ax.imshow(numeric_frame, cmap=cmap, vmin=0, vmax=6)
+    
+    # Stop frames in the end of animation
+    if frames:
+        frames.extend([frames[-1]] * int(3 * fps))
+    
+    ani = anime.FuncAnimation(fig, update, frames=frames, interval=1000 / fps)
+    writer = PillowWriter(fps=fps)
+    ani.save(filename, writer=writer)
+    print(f"Animation saved as {filename}")
+    
+    plt.close(fig)
