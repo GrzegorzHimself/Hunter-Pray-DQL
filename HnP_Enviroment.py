@@ -7,7 +7,7 @@ from matplotlib.animation import PillowWriter
 from matplotlib.colors import ListedColormap
 
 from Hnp_Player import *
-from HnP_Pathfinding import a_star_distance_modified
+from HnP_Pathfinding import a_star_distance_modified, a_star_distance_for_hunter
 
 
 # ------------------- ENVIRONMENT ------------------- #
@@ -147,6 +147,20 @@ class Environment:
             float, float, bool: Hunter and Prey reward and a status check for in the game is over due to Catch
         """
         done = False
+        
+        self.hunter.move(hunter_action, self.walls)
+        
+        hunter_cost = a_star_distance_for_hunter(self.walls,
+                                             tuple(self.hunter.position),
+                                             tuple(self.prey.position),
+                                             self.grid_size)
+        if hunter_cost is not None:
+            shaping_reward_hunter = max(0, 30 - hunter_cost)
+        else:
+            shaping_reward_hunter = 0.0
+        
+        self.cumulative_reward_hunter += shaping_reward_hunter
+        self.cumulative_reward_hunter = max(0, min(self.cumulative_reward_hunter, 30))
 
         # Hunter step
         self.hunter.move(hunter_action, self.walls)
