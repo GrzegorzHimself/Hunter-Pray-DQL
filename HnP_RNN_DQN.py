@@ -398,14 +398,38 @@ class Environment:
          - The Prey's local view (a 5x5 patch, 25 elements)
         The resulting vector has a size of 8 + 25 + 25 = 58 features
         """
+        self.hunter.update_vision(self.walls)
+        self.prey.update_vision(self.walls)
+        
         hunter_x, hunter_y = self.hunter.position
         prey_x, prey_y = self.prey.position
-        # Simplified FOV indicators
-        hunter_sees_prey = 1 if self.hunter.position == self.prey.position else 0
-        prey_sees_hunter = 1 if self.prey.position == self.hunter.position else 0
-        dx = hunter_x - prey_x
-        dy = hunter_y - prey_y
-        base_state = np.array([hunter_x, hunter_y, prey_x, prey_y, hunter_sees_prey, prey_sees_hunter, dx, dy], dtype=np.float32)
+        
+        # Does Hunter sees Prey
+        if (prey_x, prey_y) in self.hunter.vision:
+            hunter_sees_prey = 1
+            visible_prey_x = prey_x
+            visible_prey_y = prey_y
+        else:
+            hunter_sees_prey = 0
+            visible_prey_x = -1
+            visible_prey_y = -1
+
+        # Does Prey sees Hunter
+        if (hunter_x, hunter_y) in self.prey.vision:
+            prey_sees_hunter = 1
+        else:
+            prey_sees_hunter = 0
+
+        # If at least one edoesn't see, the difference will be 0
+        if hunter_sees_prey and prey_sees_hunter:
+            dx = hunter_x - prey_x
+            dy = hunter_y - prey_y
+        else:
+            dx = 0
+            dy = 0
+
+        base_state = np.array([hunter_x, hunter_y, visible_prey_x, visible_prey_y,
+                            hunter_sees_prey, prey_sees_hunter, dx, dy], dtype=np.float32)
         hunter_patch = self.hunter.get_local_view(self.walls, patch_radius=2)
         prey_patch = self.prey.get_local_view(self.walls, patch_radius=2)
         full_state = np.concatenate([base_state, hunter_patch, prey_patch])
