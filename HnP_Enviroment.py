@@ -148,6 +148,7 @@ class Environment:
         """
         done = False
         
+        # Hunter step
         self.hunter.move(hunter_action, self.walls)
         
         hunter_cost = a_star_distance_for_hunter(self.walls,
@@ -162,8 +163,6 @@ class Environment:
         self.cumulative_reward_hunter += shaping_reward_hunter
         self.cumulative_reward_hunter = max(0, min(self.cumulative_reward_hunter, 30))
 
-        # Hunter step
-        self.hunter.move(hunter_action, self.walls)
         if self.hunter.position == self.prey.position:
             reward_hunter = 30.0 + self.cumulative_reward_hunter
             reward_prey = -self.cumulative_reward_prey
