@@ -6,7 +6,7 @@ import matplotlib.animation as anime
 from matplotlib.animation import PillowWriter
 from matplotlib.colors import ListedColormap
 
-from Hnp_Player import *
+from HnP_Player import *
 from HnP_Pathfinding import a_star_distance_modified, a_star_distance_for_hunter
 
 
@@ -210,9 +210,9 @@ class Environment:
         
         # If Prey sees Hunter, apply a penalty
         cx, cy = self.prey.position
-        rel_x = self.hunter.position[0] - cx + 2
-        rel_y = self.hunter.position[1] - cy + 2
-        if 0 <= rel_x < 5 and 0 <= rel_y < 5:
+        rel_x = self.hunter.position[0] - cx + 1
+        rel_y = self.hunter.position[1] - cy + 1
+        if 0 <= rel_x < 3 and 0 <= rel_y < 3:
             if prey_view[int(rel_x), int(rel_y)] == 1.0:
                 shaping_reward_prey = max(0, shaping_reward_prey - 5.0)
 
