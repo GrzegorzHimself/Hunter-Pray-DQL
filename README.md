@@ -1,5 +1,7 @@
 # Hunter Prey DQN
 *Hunter Prey DQN* is a work-in-progress project working on RNN DQN model aiming to create a Reinforcement Learning model for training of two agents that would able to play a game of Catch without any supervision from a human.
+
+The project is solely based on [PyTorch](https://pytorch.org/) library.
 ## Goals
 - [x] Two instances of agent
 - [x] Randomly generated playground
