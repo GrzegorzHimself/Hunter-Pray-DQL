@@ -183,7 +183,7 @@ class Environment:
 
         # Check if catch occurred after Hunter's move
         if self.hunter.position == self.prey.position:
-            reward_hunter = 30.0 + self.cumulative_reward_hunter
+            reward_hunter = 30.0
             reward_prey = -self.cumulative_reward_prey
             done = True
             self.cumulative_reward_hunter = 0.0
@@ -193,31 +193,30 @@ class Environment:
         # Prey step
         self.prey.move(prey_action, self.walls)
         if self.hunter.position == self.prey.position:
-            reward_hunter = 30.0 + self.cumulative_reward_hunter
+            reward_hunter = 30
             reward_prey = -self.cumulative_reward_prey
             done = True
             self.cumulative_reward_hunter = 0.0
             self.cumulative_reward_prey = 0.0
             return reward_hunter, reward_prey, done
 
-        reward_hunter = 0.0
-        dist = a_star_distance_modified(self.walls,
-                                        tuple(self.hunter.position),
-                                        tuple(self.prey.position),
-                                        self.grid_size)
-        if dist is not None:
-            step_reward_prey = dist
-        else:
-            step_reward_prey = 0.0
-
-        # If Prey sees Hunter, apply a penalty to Prey's reward
-        prey_patch = self.prey.get_local_view(self.walls, patch_radius=2).reshape(5, 5)
+        reward_hunter = self.cumulative_reward_hunter
+        
+        prey_view = self.prey.get_local_view(self.walls, patch_radius=1).reshape(3, 3)
+        mask = np.ones(prey_view.shape, dtype=bool)
+        mask[1, 1] = False
+        open_ratio = np.mean(prey_view[mask])
+        shaping_reward_prey = max(0, 5 * (1 - open_ratio))
+        
+        # If Prey sees Hunter, apply a penalty
         cx, cy = self.prey.position
         rel_x = self.hunter.position[0] - cx + 2
         rel_y = self.hunter.position[1] - cy + 2
         if 0 <= rel_x < 5 and 0 <= rel_y < 5:
-            if prey_patch[int(rel_x), int(rel_y)] == 1.0:
-                step_reward_prey -= 5.0
+            if prey_view[int(rel_x), int(rel_y)] == 1.0:
+                shaping_reward_prey = max(0, shaping_reward_prey - 5.0)
+
+        step_reward_prey = shaping_reward_prey
                 
         step_reward_prey = max(0, min(step_reward_prey, 30))
 
