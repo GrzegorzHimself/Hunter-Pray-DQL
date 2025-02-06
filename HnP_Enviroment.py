@@ -97,11 +97,12 @@ class Environment:
         """
         self.hunter.update_vision(self.walls)
         self.prey.update_vision(self.walls)
-        
+
+        # Get positions
         hunter_x, hunter_y = self.hunter.position
         prey_x, prey_y = self.prey.position
-        
-        # Does Hunter sees Prey
+
+        # For Hunter's perspective:
         if (prey_x, prey_y) in self.hunter.vision:
             hunter_sees_prey = 1
             visible_prey_x = prey_x
@@ -111,13 +112,17 @@ class Environment:
             visible_prey_x = -1
             visible_prey_y = -1
 
-        # Does Prey sees Hunter
+        # For Prey's perspective (to decide whether to reveal opponent's position):
         if (hunter_x, hunter_y) in self.prey.vision:
             prey_sees_hunter = 1
+            visible_hunter_x = hunter_x
+            visible_hunter_y = hunter_y
         else:
             prey_sees_hunter = 0
+            visible_hunter_x = -1
+            visible_hunter_y = -1
 
-        # If at least one edoesn't see, the difference will be 0
+        # Compute differences only if both see each other (otherwise set to 0)
         if hunter_sees_prey and prey_sees_hunter:
             dx = hunter_x - prey_x
             dy = hunter_y - prey_y
@@ -125,44 +130,58 @@ class Environment:
             dx = 0
             dy = 0
 
-        base_state = np.array([hunter_x, hunter_y, visible_prey_x, visible_prey_y,
-                            hunter_sees_prey, prey_sees_hunter, dx, dy], dtype=np.float32)
+        # In the global state, we keep Hunter's coordinates always at positions [0,1]
+        # and for the opponent, we use the values from Hunter's perspective.
+        base_state = np.array([
+            hunter_x, hunter_y,               # Hunter's own position (always known)
+            visible_prey_x, visible_prey_y,   # Prey's position as seen by Hunter (or -1 if not visible)
+            hunter_sees_prey,                 # Flag: Hunter sees Prey
+            prey_sees_hunter,                 # Flag: Prey sees Hunter
+            dx, dy
+        ], dtype=np.float32)
+
         hunter_patch = self.hunter.get_local_view(self.walls, patch_radius=2)
         prey_patch = self.prey.get_local_view(self.walls, patch_radius=2)
         full_state = np.concatenate([base_state, hunter_patch, prey_patch])
         return full_state
     
     def step(self, hunter_action, prey_action):
-        """Reward logic with the accumulation of shaping rewards:
-         -  If the hunter catches the prey, the final reward for the hunter is +30 + cumulative_reward,
-            for the prey it is -cumulative_reward, and the episode terminates
-         -  If not done, Hunter receives 0, and Prey receives a shaping reward
-            (the distance computed using a_star_distance_modified with a possible penalty if Hunter is within Prey's field of view)
+        """
+        Reward logic with accumulation of shaping rewards:
+         - If the Hunter catches the Prey, the final reward for Hunter is 30 + cumulative_reward_hunter,
+           for Prey it is -cumulative_reward_prey, and the episode terminates.
+         - If not done, Hunter receives a shaping reward based on a_star_distance_for_hunter,
+           and Prey receives a shaping reward (the distance computed using a_star_distance_modified with a possible penalty
+           if Hunter is within Prey's field of view).
+         Both cumulative rewards are clipped to [0, 30].
 
         Args:
-            hunter_action (RNNAgent): Predicted action for Hunter
-            prey_action (RNNAgent): Predicted action for Prey
+            hunter_action: Predicted action for Hunter.
+            prey_action: Predicted action for Prey.
 
         Returns:
-            float, float, bool: Hunter and Prey reward and a status check for in the game is over due to Catch
+            (reward_hunter, reward_prey, done)
         """
         done = False
-        
+
         # Hunter step
+        # Move Hunter
         self.hunter.move(hunter_action, self.walls)
         
+        # Compute shaping reward for Hunter based on quality of view using A* (for Hunter)
         hunter_cost = a_star_distance_for_hunter(self.walls,
-                                             tuple(self.hunter.position),
-                                             tuple(self.prey.position),
-                                             self.grid_size)
+                                                 tuple(self.hunter.position),
+                                                 tuple(self.prey.position),
+                                                 self.grid_size)
         if hunter_cost is not None:
             shaping_reward_hunter = max(0, 30 - hunter_cost)
         else:
             shaping_reward_hunter = 0.0
-        
+
         self.cumulative_reward_hunter += shaping_reward_hunter
         self.cumulative_reward_hunter = max(0, min(self.cumulative_reward_hunter, 30))
 
+        # Check if catch occurred after Hunter's move
         if self.hunter.position == self.prey.position:
             reward_hunter = 30.0 + self.cumulative_reward_hunter
             reward_prey = -self.cumulative_reward_prey
@@ -180,16 +199,18 @@ class Environment:
             self.cumulative_reward_hunter = 0.0
             self.cumulative_reward_prey = 0.0
             return reward_hunter, reward_prey, done
-        
+
         reward_hunter = 0.0
-        dist = a_star_distance_modified(self.walls, tuple(self.hunter.position),
-                                        tuple(self.prey.position), self.grid_size)
+        dist = a_star_distance_modified(self.walls,
+                                        tuple(self.hunter.position),
+                                        tuple(self.prey.position),
+                                        self.grid_size)
         if dist is not None:
             step_reward_prey = dist
         else:
             step_reward_prey = 0.0
 
-        # If Prey sees Hunter => punish Prey:
+        # If Prey sees Hunter, apply a penalty to Prey's reward
         prey_patch = self.prey.get_local_view(self.walls, patch_radius=2).reshape(5, 5)
         cx, cy = self.prey.position
         rel_x = self.hunter.position[0] - cx + 2
@@ -199,44 +220,40 @@ class Environment:
                 step_reward_prey -= 5.0
 
         self.cumulative_reward_prey += step_reward_prey
-        
-        # Normalise Prey reward to [0, 30]:
         self.cumulative_reward_prey = max(0, min(self.cumulative_reward_prey, 30))
         
         reward_prey = step_reward_prey
         
         return reward_hunter, reward_prey, done
     
+    
     def render(self, return_frame=False):
-        """Visualisaton function to output thee process into comprnhensive concole view
-
-        Args:
-            return_frame (bool, optional): Switch if it needs to return the frame-by-frame render. Defaults to False.
-
-        Returns:
-            ndarray: An array representation of the current game state
         """
-        # Before renderind, update visualisation for both players
+        Visualization function to output the process as a comprehensive console view.
+        It overlays:
+          - Hunter and Prey positions,
+          - Hunter FOV marked as "h",
+          - Prey FOV marked as "p" (or "x" if overlapping with Hunter FOV).
+        """
+        # Update visions for both players
         self.hunter.update_vision(self.walls)
         self.prey.update_vision(self.walls)
         
-        # Build visualisation field
+        # Build visualization field (copy of walls)
         grid = [row[:] for row in self.walls]
-        # Map the players
         hx, hy = self.hunter.position
         px, py = self.prey.position
         grid[hx][hy] = "H"
         grid[px][py] = "P"
         
-        # Visualise Hunter FOV as "p"
+        # Visualize Hunter's FOV with "h"
         for (x, y) in self.hunter.vision:
             if grid[x][y] == ".":
                 grid[x][y] = "h"
         
-        # Visualise Prey FOV as "p"
+        # Visualize Prey's FOV with "p"
         for (x, y) in self.prey.vision:
             if grid[x][y] == ".":
-                # If FOVs overlap, mark as "x"
                 grid[x][y] = "p" if grid[x][y] != "h" else "x"
         
         if return_frame:
