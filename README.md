@@ -43,8 +43,10 @@ By default Hunter is set to red and its FOV is set to orange, Prey to blue and i
 The last frame stays on for 3 seconds by default.
 
 Example of the GIF output:
+
 ![GIF example](gif_example.gif)
 Example of Graph output:
+
 ![Graph example](graph_example.png)
 ## Basics of the model and the reward system
 This is an [LSTM](https://arxiv.org/pdf/1909.09586)-based [RNN](https://cs229.stanford.edu/proj2016/report/ChenYingLaird-DeepQLearningWithRecurrentNeuralNetwords-report.pdf) model featuring one base agent and deriving two training models from that: the Hunter and the Prey.
