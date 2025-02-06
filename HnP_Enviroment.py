@@ -218,6 +218,8 @@ class Environment:
         if 0 <= rel_x < 5 and 0 <= rel_y < 5:
             if prey_patch[int(rel_x), int(rel_y)] == 1.0:
                 step_reward_prey -= 5.0
+                
+        step_reward_prey = max(0, min(step_reward_prey, 30))
 
         self.cumulative_reward_prey += step_reward_prey
         self.cumulative_reward_prey = max(0, min(self.cumulative_reward_prey, 30))
