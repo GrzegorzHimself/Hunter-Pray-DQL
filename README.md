@@ -75,6 +75,8 @@ After the initial field generation, players will be spawned in random free cells
 
 The vision set of points is being calculated with the [Bresenham-based supercover line algorithm](https://dedu.fr/projects/bresenham/). This is an improved version of [Bresenham algorithm](https://csustan.csustan.edu/~tom/Lecture-Notes/Graphics/Bresenham-Line.pdf) that fixed the common issue of rays going through diagonally placSed walls. Please, read more in the source article. The settings for this algorithm shall not be altered. The generalised Python code of this algorithm can be found in [HnP_Bresenham.py](HnP_Bresenham.py).
 ## Authors
-[Grigorii Kobzarenko (Owner)](https://github.com/GrzegorzHimself)
+[Grigorii Kobzarenko](https://github.com/GrzegorzHimself)(Owner)
+
 [Kulikov Oleg](https://github.com/OlegKulikov09)
+
 [Elgawish Ahmed](https://github.com/ANElGawish)
