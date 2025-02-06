@@ -1,12 +1,12 @@
 # Hunter Prey DQN
 *Hunter Prey DQN* is a work-in-progress project working on RNN DQN model aiming to create a Reinforcement Learning model for training of two agents that would able to play a game of Catch without any supervision from a human.
 ## Goals
-- [*] Two instances of agent
-- [*] Randomly generated playground
-- [*] Working circular vision for the players
-- [*] Vision collision with walls of the playground
-- [*] Render steps in console
-- [*] Save replay as a GIF
+- [x] Two instances of agent
+- [x] Randomly generated playground
+- [x] Working circular vision for the players
+- [x] Vision collision with walls of the playground
+- [x] Render steps in console
+- [x] Save replay as a GIF
 - [ ] Save state function
 - [ ] Load and play state function
 ## Future goals
