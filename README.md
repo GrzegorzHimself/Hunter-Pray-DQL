@@ -45,6 +45,7 @@ The last frame stays on for 3 seconds by default.
 Example of the GIF output:
 
 ![GIF example](gif_example.gif)
+
 Example of Graph output:
 
 ![Graph example](graph_example.png)
