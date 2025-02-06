@@ -23,6 +23,7 @@
 | [HnP_Player.py](HnP_Player.py)           | Movement settings, local view and vision implementation               |
 | [HnP_Train.py](HnP_Train.py)             | Contains training settings as well as plot output of the final graph  |
 | [HnP_RNN.py](HnP_RNN.py)                 | RNN implementation of the network, base agent class and buffer        |
+
 The files structure is upon changing
 ## Model settings
 Go to the [HnP_Train.py](HnP_Train.py). In the top-level environment `__main__` you will be able to initialise number of episodes for players `episodes_hunter`/`episodes_prey`, number of episodes per turn `episode`, number of turns `tries`, `batch_size` or if you want to save the animations `render_on`.
