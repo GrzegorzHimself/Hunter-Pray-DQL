@@ -171,10 +171,10 @@ class Environment:
             shaping_reward_hunter = 0.0
         
         self.cumulative_reward_hunter += shaping_reward_hunter
-        self.cumulative_reward_hunter = max(0, min(self.cumulative_reward_hunter, 30))
+        self.cumulative_reward_hunter = max(0, min(self.cumulative_reward_hunter, 100))
 
         if self.hunter.position == self.prey.position:
-            reward_hunter = 30.0 + self.cumulative_reward_hunter
+            reward_hunter = self.cumulative_reward_hunter + 5
             reward_prey = -self.cumulative_reward_prey
             done = True
             self.cumulative_reward_hunter = 0.0
@@ -213,7 +213,7 @@ class Environment:
         self.cumulative_reward_prey += step_reward_prey
         
         # Normalise Prey reward to [0, 30]:
-        self.cumulative_reward_prey = max(0, min(self.cumulative_reward_prey, 30))
+        self.cumulative_reward_prey = max(0, min(self.cumulative_reward_prey, 100))
         
         reward_prey = step_reward_prey
         
