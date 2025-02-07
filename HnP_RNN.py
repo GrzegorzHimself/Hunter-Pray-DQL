@@ -21,6 +21,7 @@ class ReplayBuffer:
     def sample(self, batch_size):
         batch = random.sample(self.buffer, batch_size)
         states, actions, rewards, next_states, dones = zip(*batch)
+        actions = np.array(actions).flatten()
         return (
             torch.tensor(np.array(states), dtype=torch.float32).to(device),
             torch.tensor(actions, dtype=torch.long).to(device),
@@ -45,10 +46,10 @@ class RNN_DQN(nn.Module):
         super(RNN_DQN, self).__init__()
         self.hidden_dim = hidden_dim
         self.num_layers = num_layers
-        
+
         self.lstm = nn.LSTM(input_dim, hidden_dim, num_layers, batch_first=True)
         self.fc = nn.Linear(hidden_dim, n_actions)
-        
+
     def forward(self, x, hidden=None):
         out, hidden = self.lstm(x, hidden)  # out: (batch, seq_len, hidden_dim)
         out = out[:, -1, :]                # use the output of the last time step
@@ -59,7 +60,7 @@ class RNN_DQN(nn.Module):
 # ------------------- RNN-based AGENT ------------------- #
 class RNNAgent:
     def __init__(self, input_dim, n_actions, hidden_dim=128, num_layers=1,
-                 gamma=0.99, epsilon=1.0, epsilon_decay=0.995, epsilon_min=0.1, lr=0.001):
+                 gamma=0.99, epsilon=1.0, epsilon_decay=0.995, epsilon_min=0.1, lr=0.001, sequence_length=1):
         self.n_actions = n_actions
         self.gamma = gamma
         self.epsilon = epsilon
@@ -74,16 +75,30 @@ class RNNAgent:
         self.optimizer = optim.Adam(self.model.parameters(), lr=lr)
         self.criterion = nn.MSELoss()
         self.replay_buffer = ReplayBuffer(10000)
+        self.sequence_length = sequence_length
+        self.state_buffer = []
+        
+    def reset_buffer(self):
+        self.state_buffer = []
         
     def predict(self, state, hidden=None):
+        self.state_buffer.append(state)
+        if len(self.state_buffer) < self.sequence_length:
+            padded_sequence = self.state_buffer + [state] * (self.sequence_length - len(self.state_buffer))
+        else:
+            padded_sequence = self.state_buffer[-self.sequence_length:]
+            
+        sequence_tensor = torch.tensor(np.array(padded_sequence), dtype=torch.float32).unsqueeze(0).to(device)
+        
         if random.random() < self.epsilon:
-            return random.randint(0, self.n_actions - 1)
+            action = random.randint(0, self.n_actions - 1)
+            return action, hidden
         else:
             with torch.no_grad():
-                state_tensor = torch.tensor(state, dtype=torch.float32).unsqueeze(0).unsqueeze(0).to(device)
-                q_values, _ = self.model(state_tensor, hidden)
-                return torch.argmax(q_values, dim=1).item()
-            
+                q_values, hidden = self.model(sequence_tensor, hidden)
+                action = torch.argmax(q_values, dim=1).item()
+            return action, hidden
+        
     def update_target_model(self):
         self.target_model.load_state_dict(self.model.state_dict())
         
@@ -94,7 +109,7 @@ class RNNAgent:
         states = states.unsqueeze(1)       # [batch, seq_len=1, input_dim]
         next_states = next_states.unsqueeze(1)
         q_values, _ = self.model(states)
-        q_values = q_values.gather(1, actions.unsqueeze(-1)).squeeze(-1)
+        q_values = q_values.gather(1, actions.view(-1, 1)).squeeze(-1)
         with torch.no_grad():
             next_q_values, _ = self.target_model(next_states)
             max_next_q_values = next_q_values.max(1)[0]
