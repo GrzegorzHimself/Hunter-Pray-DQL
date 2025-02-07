@@ -65,11 +65,11 @@ For navigation the players use a set consisting of:
 	
 The first turn of the model, Hunter is learning to catch a random-moving Prey.
 
-Hunter gets rewarded for standing in position with largest FOV, and can accumulate this reward to up to 30 per episode. If it does not catch the Prey, the reward goes to zero. If it catches Prey at any point, the reward sets to the maximum value of 30.
+Hunter gets rewarded for having Pray in its FOV. The reward is equal to 12 minus the distance to the target. If it does not catch the Prey, the entire reward for the episode goes to zero. If it catches Prey at any point, the reward sets to the accumulated value plus 30.
 
 After the initial turn, the models switch. At this point, Hunter is being controlled by the latest model from the previous turn, and Prey learns from it now.
 
-Prey gets rewarded for standing in the most closed positions, which yield 5 points at most, if Prey completely covered by walls, and 0 if it stands in the open. If Hunter does not catch the Prey, the reward goes to the maximum 30. If Hunter catches Prey at any point, the reward sets to zero.
+Prey gets rewarded for standing in the most closed positions, which yield 5 points at most, if Prey completely covered by walls, and 0 if it stands in the open. If Hunter does not catch the Prey, the reward sets to the accumulated value plus 30. If Hunter catches Prey at any point, the entire episode reward sets to zero.
 
 Then the process repeats, now with the latest trained models as many times as set in the `tries` of `__main__` of [HnP_Train.py](HnP_Train.py).
 
@@ -78,7 +78,7 @@ In this project the [Cellular Automata Method](https://www.roguebasin.com/index.
 
 After the initial field generation, players will be spawned in random free cells. An [A\*](https://theory.stanford.edu/~amitp/GameProgramming/AStarComparison.html) algorithm will be used to determine if there is a free passage between these two points. If there is none, or if the spawn points overlap, the field will be regenerated and the spawn process will be repeated. the cycle repeats until a suited playground found.
 
-The vision set of points is being calculated with the [Bresenham-based supercover line algorithm](https://dedu.fr/projects/bresenham/). This is an improved version of [Bresenham algorithm](https://csustan.csustan.edu/~tom/Lecture-Notes/Graphics/Bresenham-Line.pdf) that fixed the common issue of rays going through diagonally placSed walls. Please, read more in the source article. The settings for this algorithm shall not be altered. The generalised Python code of this algorithm can be found in [HnP_Bresenham.py](HnP_Bresenham.py).
+The vision set of points is being calculated with the [Bresenham-based supercover line algorithm](https://dedu.fr/projects/bresenham/). This is an improved version of [Bresenham algorithm](https://csustan.csustan.edu/~tom/Lecture-Notes/Graphics/Bresenham-Line.pdf) that fixed the common issue of rays going through diagonally placed walls. Please, read more in the source article. The settings for this algorithm shall not be altered. The generalised Python code of this algorithm can be found in [HnP_Bresenham.py](HnP_Bresenham.py).
 ## Authors
 [Grigorii Kobzarenko](https://github.com/GrzegorzHimself) (Owner)
 

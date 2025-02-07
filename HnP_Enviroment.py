@@ -174,7 +174,7 @@ class Environment:
         self.cumulative_reward_hunter = max(0, min(self.cumulative_reward_hunter, 100))
 
         if self.hunter.position == self.prey.position:
-            reward_hunter = self.cumulative_reward_hunter + 5
+            reward_hunter = self.cumulative_reward_hunter + 30
             reward_prey = -self.cumulative_reward_prey
             done = True
             self.cumulative_reward_hunter = 0.0
@@ -186,7 +186,7 @@ class Environment:
         self.prey.update_vision(self.walls)
         
         if self.hunter.position == self.prey.position:
-            reward_hunter = self.cumulative_reward_hunter
+            reward_hunter = self.cumulative_reward_hunter + 30
             reward_prey = -self.cumulative_reward_prey
             done = True
             self.cumulative_reward_hunter = 0.0
@@ -197,7 +197,7 @@ class Environment:
         dist = a_star_distance_modified(self.walls, tuple(self.hunter.position),
                                         tuple(self.prey.position), self.grid_size)
         if dist is not None and self.hunter.position in self.prey.vision:
-            step_reward_prey = dist-5
+            step_reward_prey = 12-dist
         else:
             step_reward_prey = 1.0
 
