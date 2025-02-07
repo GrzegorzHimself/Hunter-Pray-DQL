@@ -52,6 +52,8 @@ Example of the GIF output:
 Example of Graph output:
 
 ![Graph example](graph_example.png)
+## Run
+To run the training, simply run the [HnP_Train.py](HnP_Train.py) file.
 ## Basics of the model and the reward system
 This is an [LSTM](https://arxiv.org/pdf/1909.09586)-based [RNN](https://cs229.stanford.edu/proj2016/report/ChenYingLaird-DeepQLearningWithRecurrentNeuralNetwords-report.pdf) model featuring one base agent and deriving two training models from that: the Hunter and the Prey.
 

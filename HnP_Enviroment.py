@@ -146,44 +146,35 @@ class Environment:
         return full_state
     
     def step(self, hunter_action, prey_action):
-        """
-        Reward logic with accumulation of shaping rewards:
-         - If the Hunter catches the Prey, the final reward for Hunter is 30 + cumulative_reward_hunter,
-           for Prey it is -cumulative_reward_prey, and the episode terminates.
-         - If not done, Hunter receives a shaping reward based on a_star_distance_for_hunter,
-           and Prey receives a shaping reward (the distance computed using a_star_distance_modified with a possible penalty
-           if Hunter is within Prey's field of view).
-         Both cumulative rewards are clipped to [0, 30].
+        """PLACEHOLDER TESTING
 
         Args:
-            hunter_action: Predicted action for Hunter.
-            prey_action: Predicted action for Prey.
+            hunter_action (RNNAgent): Predicted action for Hunter
+            prey_action (RNNAgent): Predicted action for Prey
 
         Returns:
-            (reward_hunter, reward_prey, done)
+            float, float, bool: Hunter and Prey reward and a status check for in the game is over due to Catch
         """
         done = False
-
-        # Hunter step
-        # Move Hunter
-        self.hunter.move(hunter_action, self.walls)
         
-        # Compute shaping reward for Hunter based on quality of view using A* (for Hunter)
+        # Hunter step
+        self.hunter.move(hunter_action, self.walls)
+        self.hunter.update_vision(self.walls)
+        
         hunter_cost = a_star_distance_for_hunter(self.walls,
-                                                 tuple(self.hunter.position),
-                                                 tuple(self.prey.position),
-                                                 self.grid_size)
-        if hunter_cost is not None:
+                                             tuple(self.hunter.position),
+                                             tuple(self.prey.position),
+                                             self.grid_size)
+        if hunter_cost is not None and self.prey.position in self.hunter.vision:
             shaping_reward_hunter = max(0, 30 - hunter_cost)
         else:
             shaping_reward_hunter = 0.0
-
+        
         self.cumulative_reward_hunter += shaping_reward_hunter
         self.cumulative_reward_hunter = max(0, min(self.cumulative_reward_hunter, 30))
 
-        # Check if catch occurred after Hunter's move
         if self.hunter.position == self.prey.position:
-            reward_hunter = 30.0
+            reward_hunter = 30.0 + self.cumulative_reward_hunter
             reward_prey = -self.cumulative_reward_prey
             done = True
             self.cumulative_reward_hunter = 0.0
@@ -192,41 +183,41 @@ class Environment:
 
         # Prey step
         self.prey.move(prey_action, self.walls)
+        self.prey.update_vision(self.walls)
+        
         if self.hunter.position == self.prey.position:
-            reward_hunter = 30
+            reward_hunter = self.cumulative_reward_hunter
             reward_prey = -self.cumulative_reward_prey
             done = True
             self.cumulative_reward_hunter = 0.0
             self.cumulative_reward_prey = 0.0
             return reward_hunter, reward_prey, done
+        
+        reward_hunter = 0.0
+        dist = a_star_distance_modified(self.walls, tuple(self.hunter.position),
+                                        tuple(self.prey.position), self.grid_size)
+        if dist is not None and self.hunter.position in self.prey.vision:
+            step_reward_prey = dist-5
+        else:
+            step_reward_prey = 1.0
 
-        reward_hunter = self.cumulative_reward_hunter
-        
-        prey_view = self.prey.get_local_view(self.walls, patch_radius=1).reshape(3, 3)
-        mask = np.ones(prey_view.shape, dtype=bool)
-        mask[1, 1] = False
-        open_ratio = np.mean(prey_view[mask])
-        shaping_reward_prey = max(0, 5 * (1 - open_ratio))
-        
-        # If Prey sees Hunter, apply a penalty
+        # If Prey sees Hunter => punish Prey:
+        prey_patch = self.prey.get_local_view(self.walls, patch_radius=2).reshape(5, 5)
         cx, cy = self.prey.position
-        rel_x = self.hunter.position[0] - cx + 1
-        rel_y = self.hunter.position[1] - cy + 1
-        if 0 <= rel_x < 3 and 0 <= rel_y < 3:
-            if prey_view[int(rel_x), int(rel_y)] == 1.0:
-                shaping_reward_prey = max(0, shaping_reward_prey - 5.0)
-
-        step_reward_prey = shaping_reward_prey
-                
-        step_reward_prey = max(0, min(step_reward_prey, 30))
+        rel_x = self.hunter.position[0] - cx + 2
+        rel_y = self.hunter.position[1] - cy + 2
+        if 0 <= rel_x < 5 and 0 <= rel_y < 5:
+            if prey_patch[int(rel_x), int(rel_y)] == 1.0:
+                step_reward_prey -= 5.0
 
         self.cumulative_reward_prey += step_reward_prey
+        
+        # Normalise Prey reward to [0, 30]:
         self.cumulative_reward_prey = max(0, min(self.cumulative_reward_prey, 30))
         
         reward_prey = step_reward_prey
         
         return reward_hunter, reward_prey, done
-    
     
     def render(self, return_frame=False):
         """

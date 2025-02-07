@@ -89,7 +89,7 @@ def train_IQL(hunter_agent, prey_agent, episodes_hunter, episodes_prey, grid_siz
     plt.plot(range(len(total_reward_hunter)), avg_hunter, color='orange', label="Hunter Avg (50)")
     plt.xlabel("Episode")
     plt.ylabel("Reward")
-    plt.title(f"IQL Hunter:\nGrid {grid_size}x{grid_size}; Turns {turns}; Episodes {episodes_hunter*tries*2}")
+    plt.title(f"RNN Hunter:\nGrid {grid_size}x{grid_size}; Turns {turns}; Episodes {episodes_hunter*tries*2}")
     plt.legend()
     plt.grid(True)
     plt.subplot(1, 2, 2)
@@ -98,7 +98,7 @@ def train_IQL(hunter_agent, prey_agent, episodes_hunter, episodes_prey, grid_siz
     plt.plot(range(len(total_reward_prey)), rolling_avg_prey, color='green', label="Prey Avg (50)")
     plt.xlabel("Episode")
     plt.ylabel("Reward")
-    plt.title(f"IQL Prey:\nGrid {grid_size}x{grid_size}; Turns {turns}; Episodes {episodes_hunter*tries*2}")
+    plt.title(f"RNN Prey:\nGrid {grid_size}x{grid_size}; Turns {turns}; Episodes {episodes_hunter*tries*2}")
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
@@ -114,9 +114,9 @@ if __name__ == "__main__":
     
     train_IQL(hunter_agent, prey_agent,
               episodes_hunter=500,
-              episodes_prey=500,
+              episodes_prey=1000,
               grid_size=grid_size,
-              turns=int(grid_size * grid_size * 3),
+              turns=int(grid_size * grid_size / 1.5),
               batch_size=64,
               tries=6,
               render_on=True)
