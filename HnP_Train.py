@@ -15,21 +15,22 @@ def train_hunter(hunter_agent, prey_agent, episodes, grid_size, turns, batch_siz
         done = False
         total_reward_hunter = 0.0
         frames = []
-        hidden = None
+        hunter_hidden = None
+        prey_hidden = None
         for turn in range(turns):
             while not done:
-                hunter_action, hidden = hunter_agent.predict(state, hidden)
+                hunter_action, hunter_hidden = hunter_agent.predict(state, hunter_hidden)
                 if len(prey_agent.replay_buffer) < 500:
                     prey_action = random.randint(0, 4)
                 else:
-                    prey_action = prey_agent.predict(state)
+                    prey_action, prey_hidden = prey_agent.predict(state, prey_hidden)
                 reward_hunter, _, done = env.step(hunter_action, prey_action)
                 next_state = env.get_state()
                 if render_on and episode >= episodes - 5:
                     frames.append(env.render(return_frame=True))
                 hunter_agent.replay_buffer.push(state, hunter_action, reward_hunter, next_state, done)
                 hunter_agent.train(batch_size)
-                state = next_state
+                state = env.get_state()
                 total_reward_hunter += reward_hunter
         hunter_agent.epsilon = max(hunter_agent.epsilon_min, hunter_agent.epsilon * hunter_agent.epsilon_decay)
         if (episode + 1) % 10 == 0:
@@ -48,18 +49,19 @@ def train_prey(prey_agent, hunter_agent, episodes, grid_size, turns, batch_size,
         done = False
         total_reward_prey = 0.0
         frames = []
-        hidden = None
+        hunter_hidden = None
+        prey_hidden = None
         for turn in range(turns):
             while not done:
-                hunter_action, hidden = hunter_agent.predict(state, hidden)
-                prey_action, hidden = prey_agent.predict(state, hidden)
+                hunter_action, hunter_hidden = hunter_agent.predict(state, hunter_hidden)
+                prey_action, prey_hidden = prey_agent.predict(state, prey_hidden)
                 _, reward_prey, done = env.step(hunter_action, prey_action)
                 next_state = env.get_state()
                 if render_on and episode >= episodes - 5:
                     frames.append(env.render(return_frame=True))
                 prey_agent.replay_buffer.push(state, prey_action, reward_prey, next_state, done)
                 prey_agent.train(batch_size)
-                state = next_state
+                state = env.get_state()
                 total_reward_prey += reward_prey
         prey_agent.epsilon = max(prey_agent.epsilon_min, prey_agent.epsilon * prey_agent.epsilon_decay)
         if (episode + 1) % 10 == 0:
